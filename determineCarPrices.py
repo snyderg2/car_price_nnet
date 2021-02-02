@@ -112,7 +112,7 @@ def createPandasDataFrame(args):
     if(args.nn_inputs):
         wanted_columns = args.nn_outputs + args.nn_inputs
         if(args.verbose):
-            print("nn_inputs == {}".format(str(args.nn_inputs)))
+            print("nn_inputs == {}\n".format(str(args.nn_inputs)))
         car_data_df = pd.read_csv(args.input_csv, nrows=5, usecols=wanted_columns)
     else:
         car_data_df = pd.read_csv(args.input_csv, nrows=5)
@@ -122,9 +122,13 @@ def createPandasDataFrame(args):
     return car_data_df
 
 def createTrainingData(args, car_df):
-    Tvalues = car_df.iloc[args.nn_outputs].values
-    Xvalues = car_df.iloc[args.nn_inputs].values
-    return partition(X, T, shuffle=True)
+    Tvalues = car_df[args.nn_outputs].values
+    Xvalues = car_df[args.nn_inputs].values
+    if(args.verbose):
+        print("Xvalues == {}\n".format(Xvalues[:10]))
+        print("Tvalues == {}\n".format(Tvalues[:10]))
+
+    return partition(Xvalues, Tvalues, shuffle=True)
     
 def createCliNeuralNetwork(args, car_df, verbose=False):
     hidden_layers = [10, 10]
@@ -151,11 +155,12 @@ if(__name__ == "__main__"):
         args.nn_outputs = list(map(str, args.nn_outputs.strip('[]').replace(" ", "").split(',')))
 
     usedCar_df = createPandasDataFrame(args)
-    #Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df)
+    Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df)
 
     if(args.verbose):
-        print("dataframe shape == {}".format(str(usedCar_df.shape)))
-        print(usedCar_df)
-        print(args)
+        print("Xtrain == {}\nTtrain == {}\n".format(Xtrain, Ttrain))
+        print("Xvalidate == {}\nTvalidate == {}\n".format(Xtrain, Ttrain))
+        print("Xtest == {}\nTtest == {}\n".format(Xtrain, Ttrain))
+        print("dataframe shape == {}\n".format(str(usedCar_df.shape)))
 
     nnet = createCliNeuralNetwork(args, usedCar_df, args.verbose)

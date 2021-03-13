@@ -113,20 +113,38 @@ def createPandasDataFrame(args):
         wanted_columns = args.nn_outputs + args.nn_inputs
         if(args.verbose):
             print("nn_inputs == {}\n".format(str(args.nn_inputs)))
-        car_data_df = pd.read_csv(args.input_csv, nrows=5, usecols=wanted_columns)
+        car_data_df = pd.read_csv(args.input_csv, usecols=wanted_columns)
     else:
-        car_data_df = pd.read_csv(args.input_csv, nrows=5)
+        car_data_df = pd.read_csv(args.input_csv)
+
+    if('price' in args.nn_outputs):
+        car_data_df = car_data_df[car_data_df['price'] > 0]
 
     # TODO clean up NANS and strings to be enums and values that can be used for training the neural network
+    column_enum_map = dict()
+    df_subset = car_data_df.select_dtypes(include=["object"])
 
-    return car_data_df
+    starting_enum = 1
+    for column in df_subset:
+        columnNoNans = df_subset[column].dropna()
+        mapping = {k: v for v, k in enumerate(columnNoNans.unique(), starting_enum )}
+        column_enum_map[column] = mapping
+        car_data_df[column] = car_data_df[column].map(mapping).fillna(0)
+
+    car_data_df.dropna(inplace=True)
+    if(args.verbose):
+        pd.set_option('max_columns', None)
+        print(car_data_df)
+        pd.set_option('max_columns', 10)
+
+    return car_data_df, column_enum_map
 
 def createTrainingData(args, car_df):
     Tvalues = car_df[args.nn_outputs].values
     Xvalues = car_df[args.nn_inputs].values
     if(args.verbose):
-        print("Xvalues == {}\n".format(Xvalues[:10]))
-        print("Tvalues == {}\n".format(Tvalues[:10]))
+        print("Xvalues.shape == {}\nXvalues == {}\n".format(Xvalues.shape, Xvalues[:5]))
+        print("Tvalues.shape == {}\nTvalues == {}\n".format(Tvalues.shape, Tvalues[:5]))
 
     return partition(Xvalues, Tvalues, shuffle=True)
     
@@ -154,13 +172,15 @@ if(__name__ == "__main__"):
     if(args.nn_outputs):
         args.nn_outputs = list(map(str, args.nn_outputs.strip('[]').replace(" ", "").split(',')))
 
-    usedCar_df = createPandasDataFrame(args)
+    usedCar_df, column_mapping_dict = createPandasDataFrame(args)
     Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df)
 
     if(args.verbose):
-        print("Xtrain == {}\nTtrain == {}\n".format(Xtrain, Ttrain))
-        print("Xvalidate == {}\nTvalidate == {}\n".format(Xtrain, Ttrain))
-        print("Xtest == {}\nTtest == {}\n".format(Xtrain, Ttrain))
+        print("Xtrain.shape == {}\nTtrain.shape == {}\n".format(Xtrain.shape, Ttrain.shape))
+        print("Xvalidate.shape == {}\nTvalidate.shape == {}\n".format(Xvalidate.shape, Tvalidate.shape))
+        print("Xtest.shape == {}\nTtest.shape == {}\n".format(Xtest.shape, Ttest.shape))
         print("dataframe shape == {}\n".format(str(usedCar_df.shape)))
 
     nnet = createCliNeuralNetwork(args, usedCar_df, args.verbose)
+    print("Xtrain == {} Ttrain == {}".format(Xtrain.shape, Ttrain.shape))
+    nnet.train(Xtrain, Ttrain, 100)

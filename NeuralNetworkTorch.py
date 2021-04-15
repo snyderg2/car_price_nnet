@@ -174,6 +174,7 @@ class NeuralNetworkTorch(torch.nn.Module):
 if __name__ == "__main__":
     X = np.arange(10).reshape(-1, 1)
     T = X * 0.1
+    nnet = NeuralNetworkTorch(X.shape[1], [20], T.shape[1])
     nnet.stand_params = nnet.calc_standardize_parameters(X, T)
     #def __init__(self, n_inputs, n_hiddens_list, n_outputs, device='cpu'):
     nnet = NeuralNetworkTorch(1, [10], 1)

@@ -1,6 +1,8 @@
 from NeuralNetworkTorch import *
 import argparse
 import pandas as pd
+from pyspark.sql import SparkSession
+import os
 
 def confusion_matrix(Y_classes, T):
     class_names = np.unique(T)
@@ -20,13 +22,15 @@ def confusion_matrix(Y_classes, T):
 def percent_correct(Y, T):
     return np.mean(Y == T) * 100
 
-def partition(X, T, fractions=(0.6, 0.2, 0.2), shuffle=True, classification=False):
+def partition(Xdf, Tdf, fractions=(0.6, 0.2, 0.2), shuffle=True, classification=False, spark=None):
     """Usage: Xtrain,Train,Xvalidate,Tvalidate,Xtest,Ttest = partition(X,T,(0.6,0.2,0.2),classification=True)
       X is nSamples x nFeatures.
       fractions can have just two values, for partitioning into train and test only
       If classification=True, T is target class as integer. Data partitioned
         according to class proportions.
         """
+    X = Xdf.values
+    T = Tdf.values
     train_fraction = fractions[0]
     if len(fractions) == 2:
         # Skip the validation step
@@ -83,6 +87,16 @@ def partition(X, T, fractions=(0.6, 0.2, 0.2), shuffle=True, classification=Fals
             Tvalidate = T[validate_indices, :]
         Xtest = X[test_indices, :]
         Ttest = T[test_indices, :]
+
+    if(spark is not None):
+        Xtrain = spark.createDataFrame(Xtrain, list(Xdf) ).rdd
+        Ttrain = spark.createDataFrame(Ttrain, Tdf.columns.array.tolist() ).rdd
+        Xtest = spark.createDataFrame(Xtest, Xdf.columns.array.tolist() ).rdd
+        Ttest = spark.createDataFrame(Ttest, Tdf.columns.array.tolist() ).rdd
+        if(n_validate > 0):
+            Xvalidate = spark.createDataFrame(Xvalidate, Xdf.columns.array.tolist()).rdd
+            Tvalidate = spark.createDataFrame(Tvalidate, Tdf.columns.array.tolist()).rdd
+
     if n_validate > 0:
         return Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest
     else:
@@ -139,14 +153,15 @@ def createPandasDataFrame(args):
 
     return car_data_df, column_enum_map
 
-def createTrainingData(args, car_df):
-    Tvalues = car_df[args.nn_outputs].values
-    Xvalues = car_df[args.nn_inputs].values
+def createTrainingData(args, car_df, spark):
+    Tvalues = car_df[args.nn_outputs]#.values
+    Xvalues = car_df[args.nn_inputs]#.values
     if(args.verbose):
         print("Xvalues.shape == {}\nXvalues == {}\n".format(Xvalues.shape, Xvalues[:5]))
         print("Tvalues.shape == {}\nTvalues == {}\n".format(Tvalues.shape, Tvalues[:5]))
 
-    return partition(Xvalues, Tvalues, shuffle=True)
+    return partition(Xvalues, Tvalues, shuffle=True, spark=spark)
+
     
 def createCliNeuralNetwork(args, car_df, verbose=False):
     hidden_layers = [10, 10]
@@ -164,6 +179,7 @@ def createCliNeuralNetwork(args, car_df, verbose=False):
 
 
 if(__name__ == "__main__"):
+
     parser = createArgParser()
     args = parser.parse_args()
     if(args.nn_inputs):
@@ -172,8 +188,11 @@ if(__name__ == "__main__"):
     if(args.nn_outputs):
         args.nn_outputs = list(map(str, args.nn_outputs.strip('[]').replace(" ", "").split(',')))
 
+    spark = SparkSession.builder.master('local').appName("price_predict").getOrCreate()
+    #spark = SparkSession.builder.master('spark://pierre:31850').appName("price_predict").getOrCreate()
+
     usedCar_df, column_mapping_dict = createPandasDataFrame(args)
-    Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df)
+    Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, spark)
 
     if(args.verbose):
         print("Xtrain.shape == {}\nTtrain.shape == {}\n".format(Xtrain.shape, Ttrain.shape))

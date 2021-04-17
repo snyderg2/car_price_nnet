@@ -90,15 +90,6 @@ def partition(Xdf, Tdf, fractions=(0.6, 0.2, 0.2), shuffle=True, classification=
         Xtest = X[test_indices, :]
         Ttest = T[test_indices, :]
 
-    # if(spark is not None):
-    #     Xtrain = spark.createDataFrame(Xtrain, list(Xdf) ).rdd
-    #     Ttrain = spark.createDataFrame(Ttrain, Tdf.columns.array.tolist() ).rdd
-    #     Xtest = spark.createDataFrame(Xtest, Xdf.columns.array.tolist() ).rdd
-    #     Ttest = spark.createDataFrame(Ttest, Tdf.columns.array.tolist() ).rdd
-    #     if(n_validate > 0):
-    #         Xvalidate = spark.createDataFrame(Xvalidate, Xdf.columns.array.tolist()).rdd
-    #         Tvalidate = spark.createDataFrame(Tvalidate, Tdf.columns.array.tolist()).rdd
-
     if n_validate > 0:
         return Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest
     else:
@@ -116,20 +107,21 @@ def createArgParser():
     parser.add_argument("-v", "--verbose", action="store_true", default=False, help="increase output verbosity")
 
     parser.add_argument("-in", "--nn_inputs", action="store", type=str, 
-                        help="list containing all the inputs wanted to be used in training pytorch nerual network")
+                        help="list containing all the inputs wanted to be used in training pytorch neurual network")
 
     parser.add_argument("-out", "--nn_outputs", action="store", type=str, required=True,
-                        help="list containing all the outputs wanted to be used in training pytorch nerual network")
+                        help="list containing all the outputs wanted to be used in training pytorch neurual network")
+
     parser.add_argument("-u", "--user_car", action="store", type=str, required=True,
-                        help="list containing all the outputs wanted to be used in training pytorch nerual network")
+                        help="list containing all the outputs wanted to be used in training pytorch neurual network")
     return parser
 
 def createPandasDataFrame(args):
     car_data_df = None
     if(args.nn_inputs):
         wanted_columns = args.nn_outputs + args.nn_inputs
-        # if(args.verbose):
-            # print("nn_inputs == {}\n".format(str(args.nn_inputs)))
+        if(args.verbose):
+            print("nn_inputs == {}\n".format(str(args.nn_inputs)))
         car_data_df = pd.read_csv(args.input_csv, usecols=wanted_columns)
     else:
         car_data_df = pd.read_csv(args.input_csv)
@@ -157,28 +149,13 @@ def createPandasDataFrame(args):
     return car_data_df, column_enum_map
 
 def createTrainingData(args, car_df):
-    Tvalues = car_df[args.nn_outputs]#.values
-    Xvalues = car_df[args.nn_inputs]#.values
-    # if(args.verbose):
-        # print("Xvalues.shape == {}\nXvalues == {}\n".format(Xvalues.shape, Xvalues[:5]))
-        # print("Tvalues.shape == {}\nTvalues == {}\n".format(Tvalues.shape, Tvalues[:5]))
+    Tvalues = car_df[args.nn_outputs]
+    Xvalues = car_df[args.nn_inputs]
+    if(args.verbose):
+        print("Xvalues.shape == {}\nXvalues == {}\n".format(Xvalues.shape, Xvalues[:5]))
+        print("Tvalues.shape == {}\nTvalues == {}\n".format(Tvalues.shape, Tvalues[:5]))
 
     return partition(Xvalues, Tvalues, shuffle=False)
-
-    
-def createCliNeuralNetwork(args, car_df, verbose=False):
-    hidden_layers = [10, 10]
-    if(args.hidden_units):
-        hidden_layers = list(map(int, args.hidden_units.strip('[]').split(',')))
-        # if(verbose):
-            # print("hidden_layers == {}".format(str(hidden_layers)))
-    
-    outputCnt = len(args.nn_inputs)
-    inputCnt = car_df.shape[1] - outputCnt
-    nnet = NeuralNetworkTorch(inputCnt, hidden_layers, outputCnt)
-    # if(args.verbose):
-        # print(str(nnet))
-    return nnet
 
 
 if(__name__ == "__main__"):
@@ -191,15 +168,15 @@ if(__name__ == "__main__"):
 
     if(args.nn_outputs):
         args.nn_outputs = list(map(str, args.nn_outputs.strip('[]').replace(" ", "").split(',')))
+
     if(args.user_car):
         args.user_car = list(map(str, args.user_car.strip('[]').replace(" ", "").split(',')))
-    # print("test",args.nn_inputs)
+
+
     # spark = SparkSession.builder.master('local').appName("price_predict").getOrCreate()
     # spark = SparkSession.builder.master('spark://denver:31850').appName("price_predict").getOrCreate()
 
     usedCar_df, column_mapping_dict = createPandasDataFrame(args)
-    # print(args.user_car[2])
-
 
     Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df)
     if(args.verbose):

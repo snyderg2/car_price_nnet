@@ -188,7 +188,7 @@ if(__name__ == "__main__"):
     if(args.nn_outputs):
         args.nn_outputs = list(map(str, args.nn_outputs.strip('[]').replace(" ", "").split(',')))
 
-    spark = SparkSession.builder.master('local').appName("price_predict").getOrCreate()
+    #spark = SparkSession.builder.master('local').appName("price_predict").getOrCreate()
     #spark = SparkSession.builder.master('spark://pierre:31850').appName("price_predict").getOrCreate()
 
     usedCar_df, column_mapping_dict = createPandasDataFrame(args)

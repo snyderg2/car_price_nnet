@@ -22,7 +22,8 @@ def confusion_matrix(Y_classes, T):
 def percent_correct(Y, T):
     return np.mean(Y == T) * 100
 
-def partition(Xdf, Tdf, fractions=(0.6, 0.2, 0.2), shuffle=True, classification=False, spark=None):
+
+def partition(Xdf, Tdf, fractions=(0.6, 0.2, 0.2), shuffle=True, classification=False):
     """Usage: Xtrain,Train,Xvalidate,Tvalidate,Xtest,Ttest = partition(X,T,(0.6,0.2,0.2),classification=True)
       X is nSamples x nFeatures.
       fractions can have just two values, for partitioning into train and test only
@@ -39,11 +40,11 @@ def partition(Xdf, Tdf, fractions=(0.6, 0.2, 0.2), shuffle=True, classification=
     else:
         validate_fraction = fractions[1]
         test_fraction = fractions[2]
-        
+
     row_indices = np.arange(X.shape[0])
     if shuffle:
         np.random.shuffle(row_indices)
-    
+
     if not classification:
         # regression, so do not partition according to targets.
         n = X.shape[0]
@@ -59,7 +60,7 @@ def partition(Xdf, Tdf, fractions=(0.6, 0.2, 0.2), shuffle=True, classification=
             Tvalidate = T[row_indices[n_train:n_train + n_validate], :]
         Xtest = X[row_indices[n_train + n_validate:n_train + n_validate + n_test], :]
         Ttest = T[row_indices[n_train + n_validate:n_train + n_validate + n_test], :]
-        
+
     else:
         # classifying, so partition data according to target class
         classes = np.unique(T)
@@ -68,7 +69,7 @@ def partition(Xdf, Tdf, fractions=(0.6, 0.2, 0.2), shuffle=True, classification=
         test_indices = []
         for c in classes:
             # row indices for class c
-            rows_this_class = np.where(T[row_indices,:] == c)[0]
+            rows_this_class = np.where(T[row_indices, :] == c)[0]
             # collect row indices for class c for each partition
             n = len(rows_this_class)
             n_train = round(train_fraction * n)
@@ -88,19 +89,11 @@ def partition(Xdf, Tdf, fractions=(0.6, 0.2, 0.2), shuffle=True, classification=
         Xtest = X[test_indices, :]
         Ttest = T[test_indices, :]
 
-    if(spark is not None):
-        Xtrain = spark.createDataFrame(Xtrain, list(Xdf) ).rdd
-        Ttrain = spark.createDataFrame(Ttrain, Tdf.columns.array.tolist() ).rdd
-        Xtest = spark.createDataFrame(Xtest, Xdf.columns.array.tolist() ).rdd
-        Ttest = spark.createDataFrame(Ttest, Tdf.columns.array.tolist() ).rdd
-        if(n_validate > 0):
-            Xvalidate = spark.createDataFrame(Xvalidate, Xdf.columns.array.tolist()).rdd
-            Tvalidate = spark.createDataFrame(Tvalidate, Tdf.columns.array.tolist()).rdd
-
     if n_validate > 0:
         return Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest
     else:
         return Xtrain, Ttrain, Xtest, Ttest
+
 
 def createArgParser():
     parser = argparse.ArgumentParser(description="Program that parses used car data csv file and trains a neural network to determine car price")
@@ -113,12 +106,14 @@ def createArgParser():
 
     parser.add_argument("-v", "--verbose", action="store_true", default=False, help="increase output verbosity")
 
-    parser.add_argument("-in", "--nn_inputs", action="store", type=str, 
-                        help="list containing all the inputs wanted to be used in training pytorch nerual network")
+    parser.add_argument("-in", "--nn_inputs", action="store", type=str,
+                        help="list containing all the inputs wanted to be used in training pytorch neurual network")
 
     parser.add_argument("-out", "--nn_outputs", action="store", type=str, required=True,
-                        help="list containing all the outputs wanted to be used in training pytorch nerual network")
+                        help="list containing all the outputs wanted to be used in training pytorch neurual network")
 
+    parser.add_argument("-u", "--user_car", action="store", type=str, required=False,
+                        help="list containing all the outputs wanted to be used in training pytorch neurual network")
     return parser
 
 def createPandasDataFrame(args):
@@ -155,8 +150,8 @@ def createPandasDataFrame(args):
     return car_data_df, column_enum_map
 
 def createTrainingData(args, car_df):
-    Tvalues = car_df[args.nn_outputs].values
-    Xvalues = car_df[args.nn_inputs].values
+    Tvalues = car_df[args.nn_outputs]
+    Xvalues = car_df[args.nn_inputs]
     if(args.verbose):
         print("Xvalues == {}\n".format(Xvalues[:10]))
         print("Tvalues == {}\n".format(Tvalues[:10]))

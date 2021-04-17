@@ -1,6 +1,7 @@
 import argparse
 import pandas as pd
 import numpy as np
+
 import os
 from NN_torch import *
 
@@ -21,7 +22,6 @@ def confusion_matrix(Y_classes, T):
 
 def percent_correct(Y, T):
     return np.mean(Y == T) * 100
-
 
 def partition(Xdf, Tdf, fractions=(0.6, 0.2, 0.2), shuffle=True, classification=False):
     """Usage: Xtrain,Train,Xvalidate,Tvalidate,Xtest,Ttest = partition(X,T,(0.6,0.2,0.2),classification=True)
@@ -144,7 +144,7 @@ def createPandasDataFrame(args):
     car_data_df.dropna(inplace=True)
     if(args.verbose):
         pd.set_option('max_columns', None)
-        print(car_data_df)
+        # print(car_data_df)
         pd.set_option('max_columns', 10)
 
     return car_data_df, column_enum_map
@@ -159,11 +159,11 @@ def createTrainingData(args, car_df):
     return partition(Xvalues, Tvalues, shuffle=True)
 
 
-
 if(__name__ == "__main__"):
 
     parser = createArgParser()
     args = parser.parse_args()
+    # print(args)
     if(args.nn_inputs):
         args.nn_inputs = list(map(str, args.nn_inputs.strip('[]').replace(" ", "").split(',')))
 
@@ -172,9 +172,8 @@ if(__name__ == "__main__"):
 
     if(args.user_car):
         args.user_car = list(map(str, args.user_car.strip('[]').replace(" ", "").split(',')))
-
-
     # print("test",args.nn_inputs)
+
     # spark = SparkSession.builder.master('local').appName("price_predict").getOrCreate()
     # spark = SparkSession.builder.master('spark://denver:31850').appName("price_predict").getOrCreate()
 

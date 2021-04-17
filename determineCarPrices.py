@@ -205,12 +205,12 @@ if(__name__ == "__main__"):
     #     print("Xvalidate.shape == {}\nTvalidate.shape == {}\n".format(Xvalidate.shape, Tvalidate.shape))
     #     print("Xtest.shape == {}\nTtest.shape == {}\n".format(Xtest.shape, Ttest.shape))
     #     print("dataframe shape == {}\n".format(str(usedCar_df.shape)))
-    print(Xtrain)
+    print(Xtrain.shape)
     year = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1)
     # print(args.user_car)
     user_car_array = []
     for i in args.user_car:
-        user_car_array.append(int(i))
+        user_car_array.append(float(i))
     print(user_car_array)
     print(np.array(user_car_array).reshape(1,11))
     print(year.use(np.array(user_car_array).reshape(1,11)))

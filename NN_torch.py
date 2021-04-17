@@ -136,12 +136,12 @@ def unstandardize_T(Tst, stand_parms):
 
 def run(Xtrain, Ttrain, Xtest, Ttest, method, n_epochs, learning_rate):
     
-    n_samples = 30
-    Xtrain = np.linspace(0., 20.0, n_samples).reshape((n_samples, 1))
-    Ttrain = 0.2 + 0.05 * (Xtrain) + 0.4 * np.sin(Xtrain / 2) + 0.2 * np.random.normal(size=(n_samples, 1))
+    # n_samples = 30
+    # Xtrain = np.linspace(0., 20.0, n_samples).reshape((n_samples, 1))
+    # Ttrain = 0.2 + 0.05 * (Xtrain) + 0.4 * np.sin(Xtrain / 2) + 0.2 * np.random.normal(size=(n_samples, 1))
 
-    Xtest = Xtrain + 0.1 * np.random.normal(size=(n_samples, 1))
-    Ttest = 0.2 + 0.05 * (Xtest) + 0.4 * np.sin(Xtest / 2) + 0.2 * np.random.normal(size=(n_samples, 1))
+    # Xtest = Xtrain + 0.1 * np.random.normal(size=(n_samples, 1))
+    # Ttest = 0.2 + 0.05 * (Xtest) + 0.4 * np.sin(Xtest / 2) + 0.2 * np.random.normal(size=(n_samples, 1))
     # print(Xtrain)
     n_inputs = Xtrain.shape[1]
     n_hiddens_list = [100, 100]

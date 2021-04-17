@@ -3,7 +3,7 @@ import argparse
 import pandas as pd
 from pyspark.sql import SparkSession
 import os
-
+from NN_torch import *
 def confusion_matrix(Y_classes, T):
     class_names = np.unique(T)
     table = []
@@ -22,7 +22,7 @@ def confusion_matrix(Y_classes, T):
 def percent_correct(Y, T):
     return np.mean(Y == T) * 100
 
-def partition(Xdf, Tdf, fractions=(0.6, 0.2, 0.2), shuffle=True, classification=False, spark=None):
+def partition(Xdf, Tdf, fractions=(0.6, 0.2, 0.2), shuffle=True, classification=False):
     """Usage: Xtrain,Train,Xvalidate,Tvalidate,Xtest,Ttest = partition(X,T,(0.6,0.2,0.2),classification=True)
       X is nSamples x nFeatures.
       fractions can have just two values, for partitioning into train and test only
@@ -88,14 +88,14 @@ def partition(Xdf, Tdf, fractions=(0.6, 0.2, 0.2), shuffle=True, classification=
         Xtest = X[test_indices, :]
         Ttest = T[test_indices, :]
 
-    if(spark is not None):
-        Xtrain = spark.createDataFrame(Xtrain, list(Xdf) ).rdd
-        Ttrain = spark.createDataFrame(Ttrain, Tdf.columns.array.tolist() ).rdd
-        Xtest = spark.createDataFrame(Xtest, Xdf.columns.array.tolist() ).rdd
-        Ttest = spark.createDataFrame(Ttest, Tdf.columns.array.tolist() ).rdd
-        if(n_validate > 0):
-            Xvalidate = spark.createDataFrame(Xvalidate, Xdf.columns.array.tolist()).rdd
-            Tvalidate = spark.createDataFrame(Tvalidate, Tdf.columns.array.tolist()).rdd
+    # if(spark is not None):
+    #     Xtrain = spark.createDataFrame(Xtrain, list(Xdf) ).rdd
+    #     Ttrain = spark.createDataFrame(Ttrain, Tdf.columns.array.tolist() ).rdd
+    #     Xtest = spark.createDataFrame(Xtest, Xdf.columns.array.tolist() ).rdd
+    #     Ttest = spark.createDataFrame(Ttest, Tdf.columns.array.tolist() ).rdd
+    #     if(n_validate > 0):
+    #         Xvalidate = spark.createDataFrame(Xvalidate, Xdf.columns.array.tolist()).rdd
+    #         Tvalidate = spark.createDataFrame(Tvalidate, Tdf.columns.array.tolist()).rdd
 
     if n_validate > 0:
         return Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest
@@ -118,7 +118,8 @@ def createArgParser():
 
     parser.add_argument("-out", "--nn_outputs", action="store", type=str, required=True,
                         help="list containing all the outputs wanted to be used in training pytorch nerual network")
-
+    parser.add_argument("-u", "--user_car", action="store", type=str, required=True,
+                        help="list containing all the outputs wanted to be used in training pytorch nerual network")
     return parser
 
 def createPandasDataFrame(args):
@@ -153,14 +154,14 @@ def createPandasDataFrame(args):
 
     return car_data_df, column_enum_map
 
-def createTrainingData(args, car_df, spark):
+def createTrainingData(args, car_df):
     Tvalues = car_df[args.nn_outputs]#.values
     Xvalues = car_df[args.nn_inputs]#.values
     if(args.verbose):
         print("Xvalues.shape == {}\nXvalues == {}\n".format(Xvalues.shape, Xvalues[:5]))
         print("Tvalues.shape == {}\nTvalues == {}\n".format(Tvalues.shape, Tvalues[:5]))
 
-    return partition(Xvalues, Tvalues, shuffle=True, spark=spark)
+    return partition(Xvalues, Tvalues, shuffle=False)
 
     
 def createCliNeuralNetwork(args, car_df, verbose=False):
@@ -182,24 +183,87 @@ if(__name__ == "__main__"):
 
     parser = createArgParser()
     args = parser.parse_args()
+    # print(args)
     if(args.nn_inputs):
         args.nn_inputs = list(map(str, args.nn_inputs.strip('[]').replace(" ", "").split(',')))
 
     if(args.nn_outputs):
         args.nn_outputs = list(map(str, args.nn_outputs.strip('[]').replace(" ", "").split(',')))
-
-    spark = SparkSession.builder.master('local').appName("price_predict").getOrCreate()
-    #spark = SparkSession.builder.master('spark://pierre:31850').appName("price_predict").getOrCreate()
+    if(args.user_car):
+        args.user_car = list(map(str, args.user_car.strip('[]').replace(" ", "").split(',')))
+    # print("test",args.nn_inputs)
+    # spark = SparkSession.builder.master('local').appName("price_predict").getOrCreate()
+    # spark = SparkSession.builder.master('spark://denver:31850').appName("price_predict").getOrCreate()
 
     usedCar_df, column_mapping_dict = createPandasDataFrame(args)
-    Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, spark)
+    # print(args.user_car[2])
 
-    if(args.verbose):
-        print("Xtrain.shape == {}\nTtrain.shape == {}\n".format(Xtrain.shape, Ttrain.shape))
-        print("Xvalidate.shape == {}\nTvalidate.shape == {}\n".format(Xvalidate.shape, Tvalidate.shape))
-        print("Xtest.shape == {}\nTtest.shape == {}\n".format(Xtest.shape, Ttest.shape))
-        print("dataframe shape == {}\n".format(str(usedCar_df.shape)))
 
-    nnet = createCliNeuralNetwork(args, usedCar_df, args.verbose)
-    print("Xtrain == {} Ttrain == {}".format(Xtrain.shape, Ttrain.shape))
-    nnet.train(Xtrain, Ttrain, 100)
+    Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df)
+    # if(args.verbose):
+    #     print("Xtrain.shape == {}\nTtrain.shape == {}\n".format(Xtrain.shape, Ttrain.shape))
+    #     print("Xvalidate.shape == {}\nTvalidate.shape == {}\n".format(Xvalidate.shape, Tvalidate.shape))
+    #     print("Xtest.shape == {}\nTtest.shape == {}\n".format(Xtest.shape, Ttest.shape))
+    #     print("dataframe shape == {}\n".format(str(usedCar_df.shape)))
+    print(Xtrain)
+    year = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1)
+    # print(args.user_car)
+    user_car_array = []
+    for i in args.user_car:
+        user_car_array.append(int(i))
+    print(user_car_array)
+    print(np.array(user_car_array).reshape(1,11))
+    print(year.use(np.array(user_car_array).reshape(1,11)))
+
+
+
+
+    # year = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[0]))[0][0]
+    # print("year:", args.user_car[0], "price: ", year)
+
+    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 1)
+    # manufacturer = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[1]))[0][0]
+    # print("manufacturer:",args.user_car[1], "price: ", manufacturer)
+
+
+
+    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 2)
+    # # print(Ttrain)
+    # model = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 5000, 0.05, int(args.user_car[2]))[0][0]
+    # print("model:",args.user_car[2], "price: ", model)
+
+    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 3)
+    # condition = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[3]))[0][0]
+    # print("condition:",args.user_car[3], "price: ", condition)
+
+    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 4)
+    # cylinders = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[4]))[0][0]
+    # print("cylinders:",args.user_car[4], "price: ", cylinders)
+
+    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 5)
+    # fuel = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[5]))[0][0]
+    # print("fuel:",args.user_car[5], "price: ", fuel)
+
+    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 6)
+    # odometer = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[6]))[0][0]
+    # print("odometer:",args.user_car[6], "price: ", odometer)
+
+    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 7)
+    # title_status = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[7]))[0][0]
+    # print("title_status:",args.user_car[7], "price: ", title_status)
+
+    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 8)
+    # transmission = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[8]))[0][0]
+    # print("transmission:",args.user_car[8], "price: ", transmission)
+
+    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 9)
+    # drive = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[9]))[0][0]
+    # print("drive:",args.user_car[9], "price: ", drive)
+
+    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 10)
+    # paint_color = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[10]))[0][0]
+    # print("paint_color:",args.user_car[10], "price: ", paint_color)
+
+    # print()
+    # total_price = year*0.3 + odometer*0.25 + model*0.2 + title_status*0.1 + manufacturer*0.05 + condition*0.05 + cylinders*0.01 + fuel*0.01 + transmission*0.01 + drive*0.01 + paint_color*0.01
+    # print("Your car's estimated price is:", total_price)

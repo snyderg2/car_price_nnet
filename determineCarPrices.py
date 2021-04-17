@@ -1,8 +1,8 @@
-from NeuralNetworkTorch import *
 import argparse
 import pandas as pd
-from pyspark.sql import SparkSession
+import numpy as np
 import os
+from NN_torch import *
 
 def confusion_matrix(Y_classes, T):
     class_names = np.unique(T)
@@ -13,7 +13,7 @@ def confusion_matrix(Y_classes, T):
         for Y_class in class_names:
             row.append(100 * np.mean(Y_classes[T == true_class] == Y_class))
         table.append(row)
-    conf_matrix = pandas.DataFrame(table, index=class_names, columns=class_names)
+    conf_matrix = pd.DataFrame(table, index=class_names, columns=class_names)
     # cf.style.background_gradient(cmap='Blues').format("{:.1f} %")
         
     return conf_matrix.style.background_gradient(cmap='Blues').format("{:.1f}")

@@ -144,7 +144,7 @@ def run(Xtrain, Ttrain, Xtest, Ttest, method, n_epochs, learning_rate):
     # Ttest = 0.2 + 0.05 * (Xtest) + 0.4 * np.sin(Xtest / 2) + 0.2 * np.random.normal(size=(n_samples, 1))
     # print(Xtrain)
     n_inputs = Xtrain.shape[1]
-    n_hiddens_list = [100, 100]
+    n_hiddens_list = [50, 50, 50, 50, 50]
     n_outputs = Ttrain.shape[1]
 
     nnet = NeuralNetwork(n_inputs, n_hiddens_list, n_outputs)
@@ -161,38 +161,38 @@ def run(Xtrain, Ttrain, Xtest, Ttest, method, n_epochs, learning_rate):
 
     print(f'Method: {method}, RMSE: Train {rmse_train:.2f} Test {rmse_test:.2f}')
 
-    plt.figure(1, figsize=(10, 10))
-    plt.clf()
+    # plt.figure(1, figsize=(10, 10))
+    # plt.clf()
 
-    n_plot_rows = nnet.n_layers + 1
-    ploti = 0
+    # n_plot_rows = nnet.n_layers + 1
+    # ploti = 0
 
-    ploti += 1
-    plt.subplot(n_plot_rows, 1, ploti)
-    plt.plot(nnet.get_error_trace())
-    plt.xlabel('Epoch')
-    plt.ylabel('RMSE')
+    # ploti += 1
+    # plt.subplot(n_plot_rows, 1, ploti)
+    # plt.plot(nnet.get_error_trace())
+    # plt.xlabel('Epoch')
+    # plt.ylabel('RMSE')
 
-    ploti += 1
-    plt.subplot(n_plot_rows, 1, ploti)
-    plt.plot(Xtrain, Ttrain, 'o', label='Training Data')
-    plt.plot(Xtest, Ttest, 'o', label='Testing Data')
-    X_for_plot = np.linspace(0, 20, 20).reshape(-1, 1)
-    Y, Zs = nnet.use(X_for_plot, return_hidden_layer_outputs=True)
-    # print(X_for_plot)
-    # print(Y)
-    plt.plot(X_for_plot, Y, label='Neural Net Output')
-    plt.legend()
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    # Y= nnet.use(np.array([year]).reshape(-1, 1))
-    # print(Y)
-    for layeri in range(nnet.n_layers - 2, -1, -1):
-        ploti += 1
-        plt.subplot(n_plot_rows, 1, ploti)
-        plt.plot(X_for_plot, Zs[layeri])
-        plt.xlabel('X')
-        plt.ylabel(f'Outputs from Layer {layeri}')
+    # ploti += 1
+    # plt.subplot(n_plot_rows, 1, ploti)
+    # plt.plot(Xtrain, Ttrain, 'o', label='Training Data')
+    # plt.plot(Xtest, Ttest, 'o', label='Testing Data')
+    # X_for_plot = np.linspace(0, 20, 20).reshape(-1, 1)
+    # Y, Zs = nnet.use(X_for_plot, return_hidden_layer_outputs=True)
+    # # print(X_for_plot)
+    # # print(Y)
+    # plt.plot(X_for_plot, Y, label='Neural Net Output')
+    # plt.legend()
+    # plt.xlabel('X')
+    # plt.ylabel('Y')
+    # # Y= nnet.use(np.array([year]).reshape(-1, 1))
+    # # print(Y)
+    # for layeri in range(nnet.n_layers - 2, -1, -1):
+    #     ploti += 1
+    #     plt.subplot(n_plot_rows, 1, ploti)
+    #     plt.plot(X_for_plot, Zs[layeri])
+    #     plt.xlabel('X')
+    #     plt.ylabel(f'Outputs from Layer {layeri}')
         
     return nnet
 # n_samples=30

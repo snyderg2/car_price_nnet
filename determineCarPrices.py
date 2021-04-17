@@ -1,4 +1,4 @@
-from NeuralNetworkTorch import *
+
 import argparse
 import pandas as pd
 from pyspark.sql import SparkSession
@@ -126,8 +126,8 @@ def createPandasDataFrame(args):
     car_data_df = None
     if(args.nn_inputs):
         wanted_columns = args.nn_outputs + args.nn_inputs
-        if(args.verbose):
-            print("nn_inputs == {}\n".format(str(args.nn_inputs)))
+        # if(args.verbose):
+            # print("nn_inputs == {}\n".format(str(args.nn_inputs)))
         car_data_df = pd.read_csv(args.input_csv, usecols=wanted_columns)
     else:
         car_data_df = pd.read_csv(args.input_csv)
@@ -149,7 +149,7 @@ def createPandasDataFrame(args):
     car_data_df.dropna(inplace=True)
     if(args.verbose):
         pd.set_option('max_columns', None)
-        print(car_data_df)
+        # print(car_data_df)
         pd.set_option('max_columns', 10)
 
     return car_data_df, column_enum_map
@@ -157,9 +157,9 @@ def createPandasDataFrame(args):
 def createTrainingData(args, car_df):
     Tvalues = car_df[args.nn_outputs]#.values
     Xvalues = car_df[args.nn_inputs]#.values
-    if(args.verbose):
-        print("Xvalues.shape == {}\nXvalues == {}\n".format(Xvalues.shape, Xvalues[:5]))
-        print("Tvalues.shape == {}\nTvalues == {}\n".format(Tvalues.shape, Tvalues[:5]))
+    # if(args.verbose):
+        # print("Xvalues.shape == {}\nXvalues == {}\n".format(Xvalues.shape, Xvalues[:5]))
+        # print("Tvalues.shape == {}\nTvalues == {}\n".format(Tvalues.shape, Tvalues[:5]))
 
     return partition(Xvalues, Tvalues, shuffle=False)
 
@@ -168,14 +168,14 @@ def createCliNeuralNetwork(args, car_df, verbose=False):
     hidden_layers = [10, 10]
     if(args.hidden_units):
         hidden_layers = list(map(int, args.hidden_units.strip('[]').split(',')))
-        if(verbose):
-            print("hidden_layers == {}".format(str(hidden_layers)))
+        # if(verbose):
+            # print("hidden_layers == {}".format(str(hidden_layers)))
     
     outputCnt = len(args.nn_inputs)
     inputCnt = car_df.shape[1] - outputCnt
     nnet = NeuralNetworkTorch(inputCnt, hidden_layers, outputCnt)
-    if(args.verbose):
-        print(str(nnet))
+    # if(args.verbose):
+        # print(str(nnet))
     return nnet
 
 
@@ -205,65 +205,13 @@ if(__name__ == "__main__"):
     #     print("Xvalidate.shape == {}\nTvalidate.shape == {}\n".format(Xvalidate.shape, Tvalidate.shape))
     #     print("Xtest.shape == {}\nTtest.shape == {}\n".format(Xtest.shape, Ttest.shape))
     #     print("dataframe shape == {}\n".format(str(usedCar_df.shape)))
-    print(Xtrain.shape)
-    year = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1)
+    # print(Xtrain.shape)
+    car = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 30000, 0.1)
     # print(args.user_car)
     user_car_array = []
     for i in args.user_car:
         user_car_array.append(float(i))
-    print(user_car_array)
-    print(np.array(user_car_array).reshape(1,11))
-    print(year.use(np.array(user_car_array).reshape(1,11)))
+    # print(user_car_array)
+    # print(np.array(user_car_array).reshape(1,11))
+    print("Yours estimated car price is: ", car.use(np.array(user_car_array).reshape(1,11))[0][0])
 
-
-
-
-    # year = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[0]))[0][0]
-    # print("year:", args.user_car[0], "price: ", year)
-
-    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 1)
-    # manufacturer = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[1]))[0][0]
-    # print("manufacturer:",args.user_car[1], "price: ", manufacturer)
-
-
-
-    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 2)
-    # # print(Ttrain)
-    # model = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 5000, 0.05, int(args.user_car[2]))[0][0]
-    # print("model:",args.user_car[2], "price: ", model)
-
-    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 3)
-    # condition = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[3]))[0][0]
-    # print("condition:",args.user_car[3], "price: ", condition)
-
-    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 4)
-    # cylinders = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[4]))[0][0]
-    # print("cylinders:",args.user_car[4], "price: ", cylinders)
-
-    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 5)
-    # fuel = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[5]))[0][0]
-    # print("fuel:",args.user_car[5], "price: ", fuel)
-
-    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 6)
-    # odometer = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[6]))[0][0]
-    # print("odometer:",args.user_car[6], "price: ", odometer)
-
-    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 7)
-    # title_status = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[7]))[0][0]
-    # print("title_status:",args.user_car[7], "price: ", title_status)
-
-    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 8)
-    # transmission = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[8]))[0][0]
-    # print("transmission:",args.user_car[8], "price: ", transmission)
-
-    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 9)
-    # drive = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[9]))[0][0]
-    # print("drive:",args.user_car[9], "price: ", drive)
-
-    # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, 10)
-    # paint_color = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 4000, 0.1, int(args.user_car[10]))[0][0]
-    # print("paint_color:",args.user_car[10], "price: ", paint_color)
-
-    # print()
-    # total_price = year*0.3 + odometer*0.25 + model*0.2 + title_status*0.1 + manufacturer*0.05 + condition*0.05 + cylinders*0.01 + fuel*0.01 + transmission*0.01 + drive*0.01 + paint_color*0.01
-    # print("Your car's estimated price is:", total_price)

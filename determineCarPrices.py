@@ -127,11 +127,8 @@ def createPandasDataFrame(args):
         wanted_columns = args.nn_outputs + args.nn_inputs
         if(args.verbose):
             print("nn_inputs == {}\n".format(str(args.nn_inputs)))
-<<<<<<< HEAD
-        car_data_df = pd.read_csv(args.input_csv, nrows=5, usecols=wanted_columns)
-=======
+
         car_data_df = pd.read_csv(args.input_csv, usecols=wanted_columns)
->>>>>>> b8b8aec393ccdba87647c7cad7055a48c3749c0a
     else:
         car_data_df = pd.read_csv(args.input_csv)
 
@@ -157,16 +154,6 @@ def createPandasDataFrame(args):
 
     return car_data_df, column_enum_map
 
-def createTrainingData(args, car_df, spark):
-    Tvalues = car_df[args.nn_outputs]#.values
-    Xvalues = car_df[args.nn_inputs]#.values
-    if(args.verbose):
-        print("Xvalues.shape == {}\nXvalues == {}\n".format(Xvalues.shape, Xvalues[:5]))
-        print("Tvalues.shape == {}\nTvalues == {}\n".format(Tvalues.shape, Tvalues[:5]))
-
-    return partition(Xvalues, Tvalues, shuffle=True, spark=spark)
-
-<<<<<<< HEAD
 def createTrainingData(args, car_df):
     Tvalues = car_df[args.nn_outputs].values
     Xvalues = car_df[args.nn_inputs].values
@@ -175,22 +162,7 @@ def createTrainingData(args, car_df):
         print("Tvalues == {}\n".format(Tvalues[:10]))
 
     return partition(Xvalues, Tvalues, shuffle=True)
-=======
->>>>>>> b8b8aec393ccdba87647c7cad7055a48c3749c0a
-    
-def createCliNeuralNetwork(args, car_df, verbose=False):
-    hidden_layers = [10, 10]
-    if(args.hidden_units):
-        hidden_layers = list(map(int, args.hidden_units.strip('[]').split(',')))
-        if(verbose):
-            print("hidden_layers == {}".format(str(hidden_layers)))
-    
-    outputCnt = len(args.nn_inputs)
-    inputCnt = car_df.shape[1] - outputCnt
-    nnet = NeuralNetworkTorch(inputCnt, hidden_layers, outputCnt)
-    if(args.verbose):
-        print(str(nnet))
-    return nnet
+
 
 
 if(__name__ == "__main__"):
@@ -203,29 +175,29 @@ if(__name__ == "__main__"):
     if(args.nn_outputs):
         args.nn_outputs = list(map(str, args.nn_outputs.strip('[]').replace(" ", "").split(',')))
 
-<<<<<<< HEAD
-    usedCar_df = createPandasDataFrame(args)
-    Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df)
+    if(args.user_car):
+        args.user_car = list(map(str, args.user_car.strip('[]').replace(" ", "").split(',')))
 
-    if(args.verbose):
-        print("Xtrain == {}\nTtrain == {}\n".format(Xtrain, Ttrain))
-        print("Xvalidate == {}\nTvalidate == {}\n".format(Xtrain, Ttrain))
-        print("Xtest == {}\nTtest == {}\n".format(Xtrain, Ttrain))
-        print("dataframe shape == {}\n".format(str(usedCar_df.shape)))
-=======
-    spark = SparkSession.builder.master('local').appName("price_predict").getOrCreate()
-    #spark = SparkSession.builder.master('spark://pierre:31850').appName("price_predict").getOrCreate()
+
+    # print("test",args.nn_inputs)
+    # spark = SparkSession.builder.master('local').appName("price_predict").getOrCreate()
+    # spark = SparkSession.builder.master('spark://denver:31850').appName("price_predict").getOrCreate()
 
     usedCar_df, column_mapping_dict = createPandasDataFrame(args)
-    Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df, spark)
->>>>>>> b8b8aec393ccdba87647c7cad7055a48c3749c0a
+    # print(args.user_car[2])
 
+    Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df)
     if(args.verbose):
         print("Xtrain.shape == {}\nTtrain.shape == {}\n".format(Xtrain.shape, Ttrain.shape))
         print("Xvalidate.shape == {}\nTvalidate.shape == {}\n".format(Xvalidate.shape, Tvalidate.shape))
         print("Xtest.shape == {}\nTtest.shape == {}\n".format(Xtest.shape, Ttest.shape))
         print("dataframe shape == {}\n".format(str(usedCar_df.shape)))
 
-    nnet = createCliNeuralNetwork(args, usedCar_df, args.verbose)
-    print("Xtrain == {} Ttrain == {}".format(Xtrain.shape, Ttrain.shape))
-    nnet.train(Xtrain, Ttrain, 100)
+    car = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 30000, 0.1)
+    # print(args.user_car)
+    user_car_array = []
+    for i in args.user_car:
+        user_car_array.append(float(i))
+    # print(user_car_array)
+    # print(np.array(user_car_array).reshape(1,11))
+    print("Yours estimated car price is: ", car.use(np.array(user_car_array).reshape(1,11))[0][0])

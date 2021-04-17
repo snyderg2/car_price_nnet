@@ -112,7 +112,7 @@ def createArgParser():
     parser.add_argument("-out", "--nn_outputs", action="store", type=str, required=True,
                         help="list containing all the outputs wanted to be used in training pytorch neurual network")
 
-    parser.add_argument("-u", "--user_car", action="store", type=str, required=True,
+    parser.add_argument("-u", "--user_car", action="store", type=str, required=False,
                         help="list containing all the outputs wanted to be used in training pytorch neurual network")
     return parser
 
@@ -122,6 +122,7 @@ def createPandasDataFrame(args):
         wanted_columns = args.nn_outputs + args.nn_inputs
         if(args.verbose):
             print("nn_inputs == {}\n".format(str(args.nn_inputs)))
+
         car_data_df = pd.read_csv(args.input_csv, usecols=wanted_columns)
     else:
         car_data_df = pd.read_csv(args.input_csv)
@@ -157,7 +158,6 @@ def createTrainingData(args, car_df):
 
     return partition(Xvalues, Tvalues, shuffle=False)
 
-
 if(__name__ == "__main__"):
 
     parser = createArgParser()
@@ -171,7 +171,6 @@ if(__name__ == "__main__"):
 
     if(args.user_car):
         args.user_car = list(map(str, args.user_car.strip('[]').replace(" ", "").split(',')))
-
 
     # spark = SparkSession.builder.master('local').appName("price_predict").getOrCreate()
     # spark = SparkSession.builder.master('spark://denver:31850').appName("price_predict").getOrCreate()

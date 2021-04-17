@@ -187,6 +187,7 @@ if(__name__ == "__main__"):
         print("Xvalidate.shape == {}\nTvalidate.shape == {}\n".format(Xvalidate.shape, Tvalidate.shape))
         print("Xtest.shape == {}\nTtest.shape == {}\n".format(Xtest.shape, Ttest.shape))
         print("dataframe shape == {}\n".format(str(usedCar_df.shape)))
+        print(Xtrain.shape)
 
     car = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 30000, 0.1)
     # print(args.user_car)

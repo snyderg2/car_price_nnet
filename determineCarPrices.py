@@ -1,9 +1,11 @@
 
 import argparse
-import pandas as pd
-from pyspark.sql import SparkSession
+
+import pandas
+
 import os
 from NN_torch import *
+
 def confusion_matrix(Y_classes, T):
     class_names = np.unique(T)
     table = []
@@ -200,12 +202,13 @@ if(__name__ == "__main__"):
 
 
     Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df)
-    # if(args.verbose):
-    #     print("Xtrain.shape == {}\nTtrain.shape == {}\n".format(Xtrain.shape, Ttrain.shape))
-    #     print("Xvalidate.shape == {}\nTvalidate.shape == {}\n".format(Xvalidate.shape, Tvalidate.shape))
-    #     print("Xtest.shape == {}\nTtest.shape == {}\n".format(Xtest.shape, Ttest.shape))
-    #     print("dataframe shape == {}\n".format(str(usedCar_df.shape)))
-    # print(Xtrain.shape)
+    if(args.verbose):
+        print("Xtrain.shape == {}\nTtrain.shape == {}\n".format(Xtrain.shape, Ttrain.shape))
+        print("Xvalidate.shape == {}\nTvalidate.shape == {}\n".format(Xvalidate.shape, Tvalidate.shape))
+        print("Xtest.shape == {}\nTtest.shape == {}\n".format(Xtest.shape, Ttest.shape))
+        print("dataframe shape == {}\n".format(str(usedCar_df.shape)))
+        print(Xtrain.shape)
+
     car = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 30000, 0.1)
     # print(args.user_car)
     user_car_array = []

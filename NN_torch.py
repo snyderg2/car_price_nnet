@@ -134,7 +134,7 @@ def unstandardize_T(Tst, stand_parms):
 
 
 
-def run(Xtrain, Ttrain, Xtest, Ttest, method, n_epochs, learning_rate):
+def run(Xtrain, Ttrain, Xtest, Ttest, method, n_epochs, learning_rate, hidden_unit_list=[50, 50, 50, 50, 50]):
     
     # n_samples = 30
     # Xtrain = np.linspace(0., 20.0, n_samples).reshape((n_samples, 1))
@@ -144,7 +144,7 @@ def run(Xtrain, Ttrain, Xtest, Ttest, method, n_epochs, learning_rate):
     # Ttest = 0.2 + 0.05 * (Xtest) + 0.4 * np.sin(Xtest / 2) + 0.2 * np.random.normal(size=(n_samples, 1))
     # print(Xtrain)
     n_inputs = Xtrain.shape[1]
-    n_hiddens_list = [50, 50, 50, 50, 50]
+    n_hiddens_list = hidden_unit_list
     n_outputs = Ttrain.shape[1]
 
     nnet = NeuralNetwork(n_inputs, n_hiddens_list, n_outputs)

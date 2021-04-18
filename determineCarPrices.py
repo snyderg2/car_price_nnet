@@ -2,10 +2,13 @@ import argparse
 import pandas as pd
 import numpy as np
 import pickle
-import os
+import sys
 from NN_torch import *
+from CarPriceWindow import InputDialog
+from PyQt5.QtWidgets import *
 
 SAVED_NNET_FILE = "car_nnet.obj"
+SAVED_INPUT_LIST_FILE = "input_list.obj"
 SAVED_INPUT_ENUM_MAP_FILE = "input_enum_map.obj"
 
 def confusion_matrix(Y_classes, T):
@@ -200,10 +203,15 @@ if(__name__ == "__main__"):
             print("nnet saved to {}".format(SAVED_NNET_FILE))
             file_write = open(SAVED_INPUT_ENUM_MAP_FILE, 'wb')
             pickle.dump(column_mapping_dict, file_write)
-            print("nnet saved to {}".format(SAVED_INPUT_ENUM_MAP_FILE))
+            print("enum_map saved to {}".format(SAVED_INPUT_ENUM_MAP_FILE))
+            file_write = open(SAVED_INPUT_LIST_FILE, 'wb')
+            pickle.dump(args.nn_inputs, file_write)
+            print("input_list saved to {}".format(SAVED_INPUT_LIST_FILE))
+
 
 
     """If there is a user car then we want to predict"""
+    used_car_input_list = None
     if(args.user_car):
         if(car is None):
             print("no currently train neural network going to load saved one")
@@ -212,18 +220,26 @@ if(__name__ == "__main__"):
                 car = pickle.load(file_read)
                 file_read = open(SAVED_INPUT_ENUM_MAP_FILE, 'rb')
                 column_mapping_dict = pickle.load(file_read)
+                file_read = open(SAVED_INPUT_LIST_FILE, 'rb')
+                input_list = pickle.load(file_read)
+                app = QApplication(sys.argv)
+                dialogue = InputDialog(input_list, column_mapping_dict)
+                if( dialogue.exec() ):
+                    used_car_input_list = dialogue.getInputList()
+
             except OSError:
                 print("Could not open/read a saved neural network need to train and save one")
                 car = None
 
-        args.user_car = list(map(str, args.user_car.strip('[]').replace(" ", "").split(',')))
-        user_car_array = []
-        for i in args.user_car:
-            user_car_array.append(float(i))
+        if(used_car_input_list is None):
+            args.user_car = list(map(str, args.user_car.strip('[]').replace(" ", "").split(',')))
+            used_car_input_list = list()
+            for i in args.user_car:
+                used_car_input_list.append(float(i))
 
         if(args.verbose):
-            print(user_car_array)
-            print(np.array(user_car_array).reshape(1,11))
+            print(used_car_input_list)
+            print(np.array(used_car_input_list).reshape(1,11))
 
         if(car is not None):
-            print("Yours estimated car price is: ", car.use(np.array(user_car_array).reshape(1,11))[0][0])
+            print("Your estimated car price is: ", car.use(np.array(used_car_input_list).reshape(1,len(used_car_input_list)))[0][0])

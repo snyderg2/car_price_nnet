@@ -192,7 +192,7 @@ if(__name__ == "__main__"):
 
         if (args.hidden_units):
             args.hidden_units = list(map(int, args.hidden_units.strip('[]').replace(" ", "").split(',')))
-            car = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 300, 0.1, args.hidden_units)
+            car = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 30000, 0.1, args.hidden_units)
         else:
             car = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 30000, 0.1)
 

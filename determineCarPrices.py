@@ -211,7 +211,7 @@ if(__name__ == "__main__"):
 
 
     """If there is a user car then we want to predict"""
-    used_car_input_list = None
+    # used_car_input_list = None
     if(args.user_car):
         if(car is None):
             print("no currently train neural network going to load saved one")
@@ -222,10 +222,16 @@ if(__name__ == "__main__"):
                 column_mapping_dict = pickle.load(file_read)
                 file_read = open(SAVED_INPUT_LIST_FILE, 'rb')
                 input_list = pickle.load(file_read)
+                # print(input_list)
                 app = QApplication(sys.argv)
                 dialogue = InputDialog(input_list, column_mapping_dict)
+                # print(column_mapping_dict)
                 if( dialogue.exec() ):
                     used_car_input_list = dialogue.getInputList()
+                    # print(type(used_car_input_list[2]))
+                    if (used_car_input_list[2] == 0 or used_car_input_list[1] == 0):
+                        print("model or make is not found, please check")
+                        quit()
 
             except OSError:
                 print("Could not open/read a saved neural network need to train and save one")

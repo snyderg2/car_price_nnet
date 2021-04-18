@@ -1,9 +1,12 @@
 import argparse
 import pandas as pd
 import numpy as np
-
+import pickle
 import os
 from NN_torch import *
+
+SAVED_NNET_FILE = "car_nnet.obj"
+SAVED_INPUT_ENUM_MAP_FILE = "input_enum_map.obj"
 
 def confusion_matrix(Y_classes, T):
     class_names = np.unique(T)
@@ -97,9 +100,9 @@ def partition(Xdf, Tdf, fractions=(0.6, 0.2, 0.2), shuffle=True, classification=
 
 def createArgParser():
     parser = argparse.ArgumentParser(description="Program that parses used car data csv file and trains a neural network to determine car price")
-    
-    parser.add_argument('input_csv', action="store", type=str, 
-                        help="provide path the csv file that contains all the used car data.")
+
+    parser.add_argument("-train_csv", "--train_nnet_csv", action="store", type=str,
+                        help="If you want to train a neural network, provide path the csv file that contains all the used car data.")
 
     parser.add_argument("-hu", "--hidden_units", action="store", type=str,
                         default=[10, 10], help="Provide list of hiddne units ej [10, 10] default is [10,10].")
@@ -109,11 +112,11 @@ def createArgParser():
     parser.add_argument("-in", "--nn_inputs", action="store", type=str,
                         help="list containing all the inputs wanted to be used in training pytorch neurual network")
 
-    parser.add_argument("-out", "--nn_outputs", action="store", type=str, required=True,
+    parser.add_argument("-out", "--nn_outputs", action="store", type=str, required=False,
                         help="list containing all the outputs wanted to be used in training pytorch neurual network")
 
     parser.add_argument("-u", "--user_car", action="store", type=str, required=False,
-                        help="list containing all the outputs wanted to be used in training pytorch neurual network")
+                        help="list containing all inputs to be used for predicting a used car")
     return parser
 
 def createPandasDataFrame(args):
@@ -123,9 +126,9 @@ def createPandasDataFrame(args):
         if(args.verbose):
             print("nn_inputs == {}\n".format(str(args.nn_inputs)))
 
-        car_data_df = pd.read_csv(args.input_csv, usecols=wanted_columns)
+        car_data_df = pd.read_csv(args.train_nnet_csv, usecols=wanted_columns)
     else:
-        car_data_df = pd.read_csv(args.input_csv)
+        car_data_df = pd.read_csv(args.train_nnet_csv)
 
     if('price' in args.nn_outputs):
         car_data_df = car_data_df[car_data_df['price'] > 0]
@@ -163,36 +166,64 @@ if(__name__ == "__main__"):
 
     parser = createArgParser()
     args = parser.parse_args()
-    # print(args)
-    if(args.nn_inputs):
-        args.nn_inputs = list(map(str, args.nn_inputs.strip('[]').replace(" ", "").split(',')))
+    car = None
+    column_mapping_dict = None
 
-    if(args.nn_outputs):
-        args.nn_outputs = list(map(str, args.nn_outputs.strip('[]').replace(" ", "").split(',')))
+    """ If wanting to train execute this code"""
+    if(args.train_nnet_csv):
+        if(args.nn_inputs):
+            args.nn_inputs = list(map(str, args.nn_inputs.strip('[]').replace(" ", "").split(',')))
+        if(args.nn_outputs):
+            args.nn_outputs = list(map(str, args.nn_outputs.strip('[]').replace(" ", "").split(',')))
+        else:
+            args.nn_outputs = ["price"]
 
+        usedCar_df, column_mapping_dict = createPandasDataFrame(args)
+        Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df)
+        if(args.verbose):
+            print("Xtrain.shape == {}\nTtrain.shape == {}\n".format(Xtrain.shape, Ttrain.shape))
+            print("Xvalidate.shape == {}\nTvalidate.shape == {}\n".format(Xvalidate.shape, Tvalidate.shape))
+            print("Xtest.shape == {}\nTtest.shape == {}\n".format(Xtest.shape, Ttest.shape))
+            print("dataframe shape == {}\n".format(str(usedCar_df.shape)))
+            print(Xtrain.shape)
+
+        if (args.hidden_units):
+            args.hidden_units = list(map(int, args.hidden_units.strip('[]').replace(" ", "").split(',')))
+            car = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 30000, 0.1, args.hidden_units)
+        else:
+            car = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 30000, 0.1)
+
+        saveNnet = input("Would you like to save the Neural Network: ").lower()
+        if(saveNnet == "yes" or saveNnet == "y"):
+            file_write = open(SAVED_NNET_FILE, 'wb')
+            pickle.dump(car, file_write)
+            print("nnet saved to {}".format(SAVED_NNET_FILE))
+            file_write = open(SAVED_INPUT_ENUM_MAP_FILE, 'wb')
+            pickle.dump(column_mapping_dict, file_write)
+            print("nnet saved to {}".format(SAVED_INPUT_ENUM_MAP_FILE))
+
+
+    """If there is a user car then we want to predict"""
     if(args.user_car):
+        if(car is None):
+            print("no currently train neural network going to load saved one")
+            try:
+                file_read = open(SAVED_NNET_FILE, 'rb')
+                car = pickle.load(file_read)
+                file_read = open(SAVED_INPUT_ENUM_MAP_FILE, 'rb')
+                column_mapping_dict = pickle.load(file_read)
+            except OSError:
+                print("Could not open/read a saved neural network need to train and save one")
+                car = None
+
         args.user_car = list(map(str, args.user_car.strip('[]').replace(" ", "").split(',')))
-    # print("test",args.nn_inputs)
+        user_car_array = []
+        for i in args.user_car:
+            user_car_array.append(float(i))
 
-    # spark = SparkSession.builder.master('local').appName("price_predict").getOrCreate()
-    # spark = SparkSession.builder.master('spark://denver:31850').appName("price_predict").getOrCreate()
+        if(args.verbose):
+            print(user_car_array)
+            print(np.array(user_car_array).reshape(1,11))
 
-    usedCar_df, column_mapping_dict = createPandasDataFrame(args)
-    # print(args.user_car[2])
-
-    Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df)
-    if(args.verbose):
-        print("Xtrain.shape == {}\nTtrain.shape == {}\n".format(Xtrain.shape, Ttrain.shape))
-        print("Xvalidate.shape == {}\nTvalidate.shape == {}\n".format(Xvalidate.shape, Tvalidate.shape))
-        print("Xtest.shape == {}\nTtest.shape == {}\n".format(Xtest.shape, Ttest.shape))
-        print("dataframe shape == {}\n".format(str(usedCar_df.shape)))
-        print(Xtrain.shape)
-
-    car = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 30000, 0.1)
-    # print(args.user_car)
-    user_car_array = []
-    for i in args.user_car:
-        user_car_array.append(float(i))
-    # print(user_car_array)
-    # print(np.array(user_car_array).reshape(1,11))
-    print("Yours estimated car price is: ", car.use(np.array(user_car_array).reshape(1,11))[0][0])
+        if(car is not None):
+            print("Yours estimated car price is: ", car.use(np.array(user_car_array).reshape(1,11))[0][0])

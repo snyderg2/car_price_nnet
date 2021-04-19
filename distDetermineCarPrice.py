@@ -52,8 +52,9 @@ SAVED_NNET_FILE = "car_nnet.obj"
 SAVED_INPUT_LIST_FILE = "input_list.obj"
 SAVED_INPUT_ENUM_MAP_FILE = "input_enum_map.obj"
 N_INPUTS = 11
-N_HIDDEN_LIST = [50,20]
+N_HIDDEN_LIST = [60,50,50,40,40]
 N_OUTPUTS = 1
+N_EPOCH = 1000
 
 
 
@@ -84,26 +85,52 @@ class Net(nn.Module):
         self.hidden1 = Linear(N_INPUTS, N_HIDDEN_LIST[0])
         kaiming_uniform_(self.hidden1.weight, nonlinearity='relu')
         self.act1 = ReLU()
+        
         # second hidden layer
         self.hidden2 = Linear(N_HIDDEN_LIST[0],N_HIDDEN_LIST[1])
         kaiming_uniform_(self.hidden2.weight, nonlinearity='relu')
         self.act2 = ReLU()
-        # third hidden layer and output
-        self.hidden3 = Linear(N_HIDDEN_LIST[1], N_OUTPUTS)
-        xavier_uniform_(self.hidden3.weight)
-        self.act3 = Sigmoid()
+        # 3rd hidden layer
+        self.hidden3 = Linear(N_HIDDEN_LIST[1],N_HIDDEN_LIST[2])
+        kaiming_uniform_(self.hidden3.weight, nonlinearity='relu')
+        self.act3 = ReLU()
+        # 4th hidden layer
+        self.hidden4 = Linear(N_HIDDEN_LIST[2],N_HIDDEN_LIST[3])
+        kaiming_uniform_(self.hidden4.weight, nonlinearity='relu')
+        self.act4 = ReLU()
+        # 5th hidden layer
+        self.hidden5 = Linear(N_HIDDEN_LIST[3],N_HIDDEN_LIST[4])
+        kaiming_uniform_(self.hidden5.weight, nonlinearity='relu')
+        self.act5 = ReLU()
+        # final hidden layer and output
+        self.hidden6 = Linear(N_HIDDEN_LIST[4], N_OUTPUTS)
+        xavier_uniform_(self.hidden6.weight)
+        self.act6 = Sigmoid()
 
     # forward propagate input
     def forward(self, X):
         # input to first hidden layer
         X = self.hidden1(X)
         X = self.act1(X)
-         # second hidden layer
+        # second hidden layer
         X = self.hidden2(X)
         X = self.act2(X)
-        # third hidden layer and output
+        
+        # 3rd hidden layer
         X = self.hidden3(X)
         X = self.act3(X)
+        
+        # 4th hidden layer
+        X = self.hidden4(X)
+        X = self.act4(X)
+        # 5th hidden layer
+        X = self.hidden5(X)
+        X = self.act5(X)
+
+        
+        # final hidden layer and output
+        X = self.hidden6(X)
+        X = self.act6(X)
         return X
     
     
@@ -246,6 +273,9 @@ def createArgParser():
     parser.add_argument("-r", "--rank", action="store", type=str, help="rank of machine. The rank of master machine should be zero")
 
     parser.add_argument("-ws", "--world_size", action="store", help="World size: total machines")
+    
+    parser.add_argument("-ep", "--epoch", action="store", help="Number of Epoch")
+    
 
     parser.add_argument("-train_csv", "--train_nnet_csv", action="store", type=str,
                         help="If you want to train a neural network, provide path the csv file that contains all the used car data.")
@@ -388,14 +418,14 @@ def run(rank, size,dataset):
         #model = nn.parallel.DistributedDataParallel(Net()).float()
     model = nn.parallel.DistributedDataParallel(Net()).float()
     optimizer = optim.SGD(model.parameters(),
-                          lr=0.01, momentum=0.7)
+                          lr=0.001, momentum=0.9)
     criterion = nn.MSELoss()#CrossEntropyLoss()
     num_batches = np.ceil(len(train_set.dataset) / float(bsz))
     #print("num_batches= ", num_batches)
     best_loss = float("inf")
-    for epoch in range(1000):
+    for epoch in range(N_EPOCH):
         epoch_loss = 0.0
-        printProgressBar(0, len(train_set), prefix = 'Progress:', suffix = 'Complete', length = 50)
+        #printProgressBar(0, len(train_set), prefix = 'Progress:', suffix = 'Complete', length = 50)
         for i, (data, target) in enumerate(train_set):
             #if torch.cuda.is_available():
               #  data, target = data.cuda(), target.cuda()
@@ -412,7 +442,7 @@ def run(rank, size,dataset):
             loss.backward()
             average_gradients(model)
             optimizer.step()
-            printProgressBar(i + 1, len(train_set), prefix = 'Progress:', suffix = 'Complete', length = 50)
+            #printProgressBar(i + 1, len(train_set), prefix = 'Progress:', suffix = 'Complete', length = 50)
         print('Rank ', dist.get_rank(), ', epoch ', epoch, ': ', epoch_loss / num_batches)
     if dist.get_rank() == 0 and epoch_loss / num_batches < best_loss:
             best_loss = epoch_loss / num_batches
@@ -450,6 +480,8 @@ if(__name__ == "__main__"):
     path = 'processedData.csv'
     train_dl, test_dl = prepare_data(path)
     print(len(train_dl.dataset), len(test_dl.dataset))
+    
+    N_EPOCH = int(args.epoch)
     run(args.rank,args.world_size,train_dl)
     """ If wanting to train execute this code"""
 """

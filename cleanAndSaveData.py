@@ -238,6 +238,33 @@ def partition_dataset(dataset):
                                          batch_size=bsz,
                                          shuffle=True)
     return train_set, bsz
+#Standardization functions..................
+def add_ones(X):
+    return np.insert(X, 0, 1, axis=1)
+
+def calc_standardize_parameters(X, T):
+    Xmeans = X.mean(axis=0)
+    Xstds = X.std(axis=0)
+    Tmeans = T.mean(axis=0)
+    Tstds = T.std(axis=0)
+    return {'Xmeans': Xmeans, 'Xstds': Xstds,
+            'Tmeans': Tmeans, 'Tstds': Tstds}
+
+def standardize_X(X, stand_parms):
+    return (X - stand_parms['Xmeans']) / stand_parms['Xstds']
+
+
+def unstandardize_X(Xst, stand_parms):
+    return Xst * stand_parms['Xstds'] + stand_parms['Xmeans']
+
+
+def standardize_T(T, stand_parms):
+    return (T - stand_parms['Tmeans']) / stand_parms['Tstds']
+
+
+def unstandardize_T(Tst, stand_parms):
+    return Tst * stand_parms['Tstds'] + stand_parms['Tmeans']
+
 
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'carson-city'
@@ -279,9 +306,14 @@ if(__name__ == "__main__"):
         usedCar_df, column_mapping_dict = createPandasDataFrame(args)
         # Saving the cleaned data
         usedCar_df = usedCar_df[args.nn_inputs+args.nn_outputs]
+        data = np.array(usedCar_df)
+        stand_params = calc_standardize_parameters(data,data[:,-1:])
+        data = standardize_X(data, stand_params)
+        np.savetxt("processedData.csv", data, delimiter=",")
+        #test = standardize_T(test, stand_params)
         #usedCar_df = usedCar_df.iloc[: , 1:]
-        usedCar_df.to_csv("processedData.csv", index=False)
-       # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df)
+        #usedCar_df.to_csv("processedData.csv", index=False)
+        # Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df)
         
         #--------------Partition Data for Parallel execution--------------
         #XXtrain,bsz = partition_dataset(Xtrain)

@@ -51,8 +51,8 @@ from torch.nn.init import xavier_uniform_
 SAVED_NNET_FILE = "car_nnet.obj"
 SAVED_INPUT_LIST_FILE = "input_list.obj"
 SAVED_INPUT_ENUM_MAP_FILE = "input_enum_map.obj"
-N_INPUTS = 11
-N_HIDDEN_LIST = [60,50,50,40,40]
+N_INPUTS = 6
+N_HIDDEN_LIST = [10,10]
 N_OUTPUTS = 1
 N_EPOCH = 1000
 
@@ -83,27 +83,27 @@ class Net(nn.Module):
         super(Net, self).__init__()
         # input to first hidden layer
         self.hidden1 = Linear(N_INPUTS, N_HIDDEN_LIST[0])
-        kaiming_uniform_(self.hidden1.weight, nonlinearity='relu')
-        self.act1 = ReLU()
+        kaiming_uniform_(self.hidden1.weight, nonlinearity='sigmoid')
+        self.act1 = Sigmoid()
         
         # second hidden layer
         self.hidden2 = Linear(N_HIDDEN_LIST[0],N_HIDDEN_LIST[1])
-        kaiming_uniform_(self.hidden2.weight, nonlinearity='relu')
-        self.act2 = ReLU()
+        kaiming_uniform_(self.hidden2.weight, nonlinearity='sigmoid')
+        self.act2 = Sigmoid()
         # 3rd hidden layer
-        self.hidden3 = Linear(N_HIDDEN_LIST[1],N_HIDDEN_LIST[2])
-        kaiming_uniform_(self.hidden3.weight, nonlinearity='relu')
-        self.act3 = ReLU()
+        #self.hidden3 = Linear(N_HIDDEN_LIST[1],N_HIDDEN_LIST[2])
+        #kaiming_uniform_(self.hidden3.weight, nonlinearity='relu')
+        #self.act3 = ReLU()
         # 4th hidden layer
-        self.hidden4 = Linear(N_HIDDEN_LIST[2],N_HIDDEN_LIST[3])
-        kaiming_uniform_(self.hidden4.weight, nonlinearity='relu')
-        self.act4 = ReLU()
+        #self.hidden4 = Linear(N_HIDDEN_LIST[2],N_HIDDEN_LIST[3])
+        #kaiming_uniform_(self.hidden4.weight, nonlinearity='relu')
+        #self.act4 = ReLU()
         # 5th hidden layer
-        self.hidden5 = Linear(N_HIDDEN_LIST[3],N_HIDDEN_LIST[4])
-        kaiming_uniform_(self.hidden5.weight, nonlinearity='relu')
-        self.act5 = ReLU()
+        #self.hidden5 = Linear(N_HIDDEN_LIST[3],N_HIDDEN_LIST[4])
+        #kaiming_uniform_(self.hidden5.weight, nonlinearity='relu')
+        #self.act5 = ReLU()
         # final hidden layer and output
-        self.hidden6 = Linear(N_HIDDEN_LIST[4], N_OUTPUTS)
+        self.hidden6 = Linear(N_HIDDEN_LIST[1], N_OUTPUTS)
         xavier_uniform_(self.hidden6.weight)
         self.act6 = Sigmoid()
 
@@ -117,15 +117,15 @@ class Net(nn.Module):
         X = self.act2(X)
         
         # 3rd hidden layer
-        X = self.hidden3(X)
-        X = self.act3(X)
+        #X = self.hidden3(X)
+        #X = self.act3(X)
         
         # 4th hidden layer
-        X = self.hidden4(X)
-        X = self.act4(X)
+        #X = self.hidden4(X)
+        #X = self.act4(X)
         # 5th hidden layer
-        X = self.hidden5(X)
-        X = self.act5(X)
+        #X = self.hidden5(X)
+        #X = self.act5(X)
 
         
         # final hidden layer and output
@@ -139,14 +139,14 @@ class CSVDataset(Dataset):
     # load the dataset
     def __init__(self, path):
         # load the csv file as a dataframe
-        df = pd.read_csv(path, header=1)
+        df = pd.read_csv(path, header=None)
         # store the inputs and outputs
         self.X = df.values[:, :-1]
-        self.y = df.values[:, -1]
+        self.y = df.values[:, -1:]
         # ensure input data is floats
         self.X = self.X.astype('float32')
         # label encode target and ensure the values are floats
-        self.y = LabelEncoder().fit_transform(self.y)
+        #self.y = LabelEncoder().fit_transform(self.y)
         self.y = self.y.astype('float32')
         self.y = self.y.reshape((len(self.y), 1))
 
@@ -171,6 +171,14 @@ def prepare_data(path):
     dataset = CSVDataset(path)
     # calculate split
     train, test = dataset.get_splits()
+    #Xt =  train[:,:-2]
+    #Tt = train[:,-1:]
+    #train = np.array(train)
+    #test = np.array(test)
+    #stand_params = calc_standardize_parameters(train,test)
+    #train = standardize_X(train, stand_params)
+    #test = standardize_T(test, stand_params)
+    
     # prepare data loaders
     #train_dl = DataLoader(train, batch_size=32, shuffle=True)
     #test_dl = DataLoader(test, batch_size=1024, shuffle=False)
@@ -375,7 +383,7 @@ class DataPartitioner(object):
 def partition_dataset(dataset):
 
     size = dist.get_world_size()
-    bsz = int(128 / float(size))
+    bsz = int(256 / float(size))
     partition_sizes = [1.0 / size for _ in range(size)]
     partition = DataPartitioner(dataset, partition_sizes)
     partition = partition.use(dist.get_rank())
@@ -412,13 +420,13 @@ def run(rank, size,dataset):
     train_set, bsz = partition_dataset(dataset)
     #print("bsz=",bsz)
     #if torch.cuda.is_available():
-       # model = nn.parallel.DistributedDataParallel(Net()).float().cuda()
-     #   print('yes')
-  #  else:
-        #model = nn.parallel.DistributedDataParallel(Net()).float()
+     #   model = nn.parallel.DistributedDataParallel(Net()).float().cuda()
+      #  print('yes')
+    #else:
+     #   model = nn.parallel.DistributedDataParallel(Net()).float()
     model = nn.parallel.DistributedDataParallel(Net()).float()
     optimizer = optim.SGD(model.parameters(),
-                          lr=0.001, momentum=0.9)
+                          lr=0.001, momentum=0.5)
     criterion = nn.MSELoss()#CrossEntropyLoss()
     num_batches = np.ceil(len(train_set.dataset) / float(bsz))
     #print("num_batches= ", num_batches)
@@ -428,17 +436,25 @@ def run(rank, size,dataset):
         #printProgressBar(0, len(train_set), prefix = 'Progress:', suffix = 'Complete', length = 50)
         for i, (data, target) in enumerate(train_set):
             #if torch.cuda.is_available():
-              #  data, target = data.cuda(), target.cuda()
+               # data, target = data.cuda(), target.cuda()
             
-            #print(data.shape)
+            #print(data[:5])
+            #print(target[:5])
+            
+            #Standardizing values...........
+            #stand_params = calc_standardize_parameters(data, target)
+            #data = standardize_X(data, stand_params)
+            #target = standardize_T(target, stand_params)
+            #print(data)
             #print(target)
             optimizer.zero_grad()
             
             output = model(data)
+            #print(unstandardize_T(output,stand_params))
             loss = criterion(output, target)
             
             epoch_loss += loss.item()
-            #print("epoch loss = ",epoch_loss)
+            #print("epoch loss = ",loss.item())
             loss.backward()
             average_gradients(model)
             optimizer.step()
@@ -447,14 +463,40 @@ def run(rank, size,dataset):
     if dist.get_rank() == 0 and epoch_loss / num_batches < best_loss:
             best_loss = epoch_loss / num_batches
             torch.save(model.state_dict(), "best_model.pth")
+#Standardization functions..................
+def add_ones(X):
+    return np.insert(X, 0, 1, axis=1)
+
+def calc_standardize_parameters(X, T):
+    Xmeans = X.mean(axis=0)
+    Xstds = X.std(axis=0)
+    Tmeans = T.mean(axis=0)
+    Tstds = T.std(axis=0)
+    return {'Xmeans': Xmeans, 'Xstds': Xstds,
+            'Tmeans': Tmeans, 'Tstds': Tstds}
+
+def standardize_X(X, stand_parms):
+    return (X - stand_parms['Xmeans']) / stand_parms['Xstds']
+
+
+def unstandardize_X(Xst, stand_parms):
+    return Xst * stand_parms['Xstds'] + stand_parms['Xmeans']
+
+
+def standardize_T(T, stand_parms):
+    return (T - stand_parms['Tmeans']) / stand_parms['Tstds']
+
+
+def unstandardize_T(Tst, stand_parms):
+    return Tst * stand_parms['Tstds'] + stand_parms['Tmeans']
 
   
 def setup(rank, world_size):
-    os.environ['MASTER_ADDR'] = 'carson-city'
-    os.environ['MASTER_PORT'] = '30044'
+    os.environ['MASTER_ADDR'] = 'olympia'
+    os.environ['MASTER_PORT'] = '30046'
 
     # initialize the process group
-    dist.init_process_group("gloo", rank=int(rank), world_size=int(world_size), init_method='tcp://carson-city:30045', timeout=datetime.timedelta(weeks=120))
+    dist.init_process_group("gloo", rank=int(rank), world_size=int(world_size), init_method='tcp://olympia:30047', timeout=datetime.timedelta(weeks=120))
 
     # Explicitly setting seed to make sure that models created in two processes
     # start from same random weights and biases.

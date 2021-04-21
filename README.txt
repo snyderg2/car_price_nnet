@@ -24,3 +24,7 @@ python3 ./distDetermineCarPrice.py -r 1 -ws 4 -ep 100000
 python3 ./distDetermineCarPrice.py -r 2 -ws 4 -ep 100000
 # in 4th machine 
 python3 ./distDetermineCarPrice.py -r 3 -ws 4 -ep 100000
+
+## To predict use the following command. user_car data are provided in the code. I didn't make it generalized
+
+python3 ./distPredict.py -r 0 -ws 1 -train_csv ./vehicles_large.csv -hu "[20, 20]" -out "[price]" -in "[manufacturer, model, condition, cylinders, fuel, odometer]"

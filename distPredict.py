@@ -53,7 +53,7 @@ SAVED_NNET_FILE = "car_nnet.obj"
 SAVED_INPUT_LIST_FILE = "input_list.obj"
 SAVED_INPUT_ENUM_MAP_FILE = "input_enum_map.obj"
 N_INPUTS = 6
-N_HIDDEN_LIST = [20,10]
+N_HIDDEN_LIST = [10,10]
 N_OUTPUTS = 1
 N_EPOCH = 1000
 
@@ -149,7 +149,6 @@ class Net(T.nn.Module):
         z = T.relu(self.hid2(z))
         z = self.oupt(z)  # no activation
         return z
-    
     
 # dataset definition
 class CSVDataset(Dataset):
@@ -423,7 +422,7 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
 def average_gradients(model):
     size = float(dist.get_world_size())
     for param in model.parameters():
-        dist.all_reduce(param.grad.data, op=dist.ReduceOp.SUM)
+        dist.all_reduce(param.grad.data, op=dist.reduce_op.SUM)
         param.grad.data /= size
         
 def load_model(model, path):
@@ -467,10 +466,6 @@ def run(rank, size,dataset):
             optimizer.zero_grad()
             
             output = model(data)
-            if(epoch%1000==0):
-              print("data=\n",data)
-              print("target = \n", target)
-              print("Output = \n",output)
             #print(unstandardize_T(output,stand_params))
             loss = criterion(output, target)
             
@@ -481,9 +476,9 @@ def run(rank, size,dataset):
             optimizer.step()
             #printProgressBar(i + 1, len(train_set), prefix = 'Progress:', suffix = 'Complete', length = 50)
         print('Rank ', dist.get_rank(), ', epoch ', epoch, ': ', epoch_loss / num_batches)
-        if dist.get_rank() == 0 and epoch_loss / num_batches < best_loss:
-                best_loss = epoch_loss / num_batches
-                torch.save(model.state_dict(), "best_model.pth")
+    if dist.get_rank() == 0 and epoch_loss / num_batches < best_loss:
+            best_loss = epoch_loss / num_batches
+            torch.save(model.state_dict(), "best_model.pth")
 #Standardization functions..................
 def add_ones(X):
     return np.insert(X, 0, 1, axis=1)
@@ -513,11 +508,11 @@ def unstandardize_T(Tst, stand_parms):
 
   
 def setup(rank, world_size):
-    os.environ['MASTER_ADDR'] = 'olympia'
-    os.environ['MASTER_PORT'] = '30046'
+    os.environ['MASTER_ADDR'] = 'austin'
+    os.environ['MASTER_PORT'] = '30060'
 
     # initialize the process group
-    dist.init_process_group("gloo", rank=int(rank), world_size=int(world_size), init_method='tcp://olympia:30047', timeout=datetime.timedelta(weeks=120))
+    dist.init_process_group("gloo", rank=int(rank), world_size=int(world_size), init_method='tcp://austin:30061', timeout=datetime.timedelta(weeks=120))
 
     # Explicitly setting seed to make sure that models created in two processes
     # start from same random weights and biases.
@@ -539,15 +534,13 @@ if(__name__ == "__main__"):
         except Exception as e:
             traceback.print_exc()
             sys.exit(3)
-        # prepare the data
-    path = 'processedData.csv'
-    train_dl, test_dl = prepare_data(path)
-    print(len(train_dl.dataset), len(test_dl.dataset))
+
+   # train_dl, test_dl = prepare_data(path)
+    #print(len(train_dl.dataset), len(test_dl.dataset))
     
-    N_EPOCH = int(args.epoch)
-    run(args.rank,args.world_size,train_dl)
+    #N_EPOCH = int(args.epoch)
+   # run(args.rank,args.world_size,train_dl)
     """ If wanting to train execute this code"""
-"""
     if(args.train_nnet_csv):
         if(args.nn_inputs):
             args.nn_inputs = list(map(str, args.nn_inputs.strip('[]').replace(" ", "").split(',')))
@@ -557,15 +550,38 @@ if(__name__ == "__main__"):
             args.nn_outputs = ["price"]
 
         usedCar_df, column_mapping_dict = createPandasDataFrame(args)
-        Xtrain, Ttrain, Xvalidate, Tvalidate, Xtest, Ttest = createTrainingData(args, usedCar_df)
-        
-        #--------------Partition Data for Parallel execution--------------
-        trainData = np.concatenate((Xtrain, Ttrain), axis=1)
-        run(args.rank,args.world_size,trainData)
-        #print(XXtrain)
-        #XXtest,bsz = partition_dataset(Xtest)
-        
+        # Saving the cleaned data
+        usedCar_df = usedCar_df[args.nn_inputs+args.nn_outputs]
+        data = np.array(usedCar_df)
+        stand_params = calc_standardize_parameters(data[:,:-1],data[:,-1:])
+        #data = standardize_X(data, stand_params)
+        #np.savetxt("processedData.csv", data, delimiter=",")
+     
+        # prepare the data
+    path = 'best_model.pth'
+    #model = Net()
+    #model = load_model(model,path)
+    model = nn.parallel.DistributedDataParallel(Net()).float()
+    user_car1 = [-9.58E-01,	-1.09E+00,	3.55E-02,	-4.86E-01,	-2.32E-01,	-8.84E-01]
+    user_car2 = [-8.24E-01,	-1.08E+00,	1.05E+00,	3.29E-01,	-2.32E-01,	-1.28E-01]
+    data = user_car1
+    #output = model(args.user_car_)
+    print(model)
+    mm=model.load_state_dict(torch.load(path, map_location='cpu'))
+    model.eval()
+    print(model)
+    #data = [-1.0920e+00,  6.6603e-01, -9.7611e-01,  1.1438e+00, -2.3185e-01, -5.6454e-01]
+    #tensor = torch.tensor([[1,2,3]],dtype=torch.float32)
+    #data = Tensor([data],dtype = torch.float32)
+    data = torch.FloatTensor(data)
+    output = model(data)
+    print(output)  
+    out = output.cpu().detach().numpy()
+    out = unstandardize_T(out,stand_params)
+    print("Predicted Price = ",out)
        
+        
+"""       
     
         if(args.verbose):
             print("Xtrain.shape == {}\nTtrain.shape == {}\n".format(Xtrain.shape, Ttrain.shape))

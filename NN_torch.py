@@ -2,109 +2,171 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import optimizers
+import torch
+class NeuralNetwork(torch.nn.Module):
 
-class NeuralNetwork():
-    def __init__(self, n_inputs, n_hiddens_list, n_outputs):
+    def __init__(self, n_inputs, n_hiddens_list, n_outputs, device='cpu'):
+
+        super().__init__()
+
         self.n_inputs = n_inputs
         self.n_hiddens_list = n_hiddens_list
         self.n_outputs = n_outputs
-        self.n_layers = len(n_hiddens_list)
-        self.all_weights, self.Ws = self.make_weights()
-        self.all_gradients, self.Gs = self.make_weights()
-        self.initialize_weights()
-    def __repr__(self):
-        return f'NeuralNetwork({self.n_inputs}, {self.n_hiddens_list}, {self.n_outputs})'
-    
-    def make_weights(self):
-        n_Ws = []
-        n_Ws.append((1 + self.n_inputs) * self.n_hiddens_list[0])
-        if (len(self.n_hiddens_list) > 1):
-            for i in range(len(self.n_hiddens_list)-1):
-                n_Ws.append(n_Ws[i]+(1 + self.n_hiddens_list[i]) * self.n_hiddens_list[i+1])
-        n_Ws.append(n_Ws[len(n_Ws)-1]+(1 + self.n_hiddens_list[len(self.n_hiddens_list)-1]) * self.n_outputs)
-        n_weights = 0
-        for i in n_Ws:
-            n_weights = n_Ws[len(n_Ws)-1]
-        all_weights = np.zeros(n_weights)
-        Ws = []
-        Ws.append(all_weights[:n_Ws[0]].reshape(1 + self.n_inputs, self.n_hiddens_list[0]))
-        if (len(self.n_hiddens_list)!=1):
-            for i in range(len(self.n_hiddens_list)-1):
-                Ws.append(all_weights[n_Ws[i]:n_Ws[i+1]].reshape(1 + self.n_hiddens_list[i], self.n_hiddens_list[i+1])) 
-        Ws.append(all_weights[n_Ws[len(n_Ws)-2]:].reshape(1 + self.n_hiddens_list[len(self.n_hiddens_list)-1], self.n_outputs))
-        return all_weights, Ws
-    
-    def initialize_weights(self):
-        self.Ws[0][:] = np.random.uniform(-1, 1, size = (1 + self.n_inputs, self.n_hiddens_list[0])) / np.sqrt(self.n_inputs + 1)
-        if (len(self.n_hiddens_list)!=1):
-            for i in range(len(self.n_hiddens_list)-1):
-                self.Ws[i+1][:] = np.random.uniform(-1, 1, size = (1 + self.n_hiddens_list[i], self.n_hiddens_list[i+1])) / np.sqrt(self.n_hiddens_list[i] + 1)
-        self.Ws[len(self.Ws)-1][:] = np.random.uniform(-1, 1, size=(1 + self.n_hiddens_list[len(self.n_hiddens_list)-1], self.n_outputs)) / np.sqrt(self.n_hiddens_list[len(self.n_hiddens_list)-1] + 1)
+        self.device = device
 
-  
-    def train(self, X, T, n_epochs, learning_rate=0, method = 'adam', verbose=True):
-        self.stand_params = calc_standardize_parameters(X, T)
-        Xst = standardize_X(X, self.stand_params)
-        Tst = standardize_T(T, self.stand_params)
-        optimizer = optimizers.Optimizers(self.all_weights)
-        def error_convert(mse_st):
-            if T.shape[1] == 1:
-                return np.sqrt(mse_st) * self.stand_params['Tstds'][0]
-            else:
-                return np.sqrt(mse_st)
+        self.n_layers = len(n_hiddens_list) + 1
+        
+        self.layers = torch.nn.ModuleList()
+        for n_units in n_hiddens_list:
+            self.layers.append(self._make_tanh_layer(n_inputs, n_units))
+            n_inputs = n_units
+        self.layers.append(torch.nn.Linear(n_inputs, n_outputs))
+
+        self.stand_params = None
+        self.error_trace = []
+        self.error_trace_val = []
+
+    def _make_tanh_layer(self, n_inputs, n_units):
+        return torch.nn.Sequential(torch.nn.Linear(n_inputs, n_units),
+                                   torch.nn.Tanh())
+
+    def __repr__(self):
+        return f'NeuralNetworkTorch({self.n_inputs}, {self.n_hiddens_list}, {self.n_outputs}, device={self.device})'
+
+    def forward(self, Xst):
+        Ys = [Xst]
+        for layer in self.layers:
+            Ys.append(layer(Ys[-1]))
+        return Ys[1:]  # remove X from Ys
+
+    def train(self, Xtrain, Ttrain, n_epochs=10, learning_rate=0.01, method='adam', verbose=True, Xval=None, Tval=None):
+#         self.layers.to('cuda')
+        if isinstance(Xtrain, np.ndarray):
+            Xtrain = torch.from_numpy(Xtrain.astype(np.float32))
+        if isinstance(Ttrain, np.ndarray):
+            Ttrain = torch.from_numpy(Ttrain.astype(np.float32))
+
+        if Xval is not None:
+            if isinstance(Xval, np.ndarray):
+                Xval = torch.from_numpy(Xval.astype(np.float32))
+            if isinstance(Tval, np.ndarray):
+                Tval = torch.from_numpy(Tval.astype(np.float32))
+
+        self.stand_params = self.calc_standardize_parameters(Xtrain, Ttrain)
+        Xtrain = self.standardize_X(Xtrain)
+        Ttrain = self.standardize_T(Ttrain)
+        if Xval is not None:
+            Xval = self.standardize_X(Xval)
+            Tval = self.standardize_T(Tval)
+
         if method == 'sgd':
-            self.error_trace = optimizer.sgd(self.mse, self.backward, [Xst, Tst], n_epochs, learning_rate, error_convert_f=error_convert)
+            optimizer = torch.optim.SGD(self.parameters(), lr=learning_rate)
         elif method == 'adam':
-            self.error_trace = optimizer.adam(self.mse, self.backward, [Xst, Tst], n_epochs, learning_rate, error_convert_f=error_convert)
-        elif method == 'scg':
-            learning_rate = None
-            self.error_trace = optimizer.scg(self.mse, self.backward, [Xst, Tst], n_epochs, learning_rate)
+            optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
         else:
-            print('method must be ''sgd'', ''adam'', or ''scg''.')
-    
+            print('train: method must be \'sgd\', or \'adam\'.')
+
+        error_f = torch.nn.MSELoss()
+
+        self.best_epoch = None
+        best_mse = None
+        best_weights = self.get_all_weights()
+        
+        for epoch in range(n_epochs):
+
+            Ytrain = self.forward(Xtrain)[-1]  # to get last layer output
+            mse = error_f(Ytrain, Ttrain)
+
+            optimizer.zero_grad()
+            mse.backward()
+            optimizer.step()
+
+            self.error_trace.append(mse.sqrt())
+            
+            if Xval is not None:
+                Yval = self.forward(Xval)[-1]
+                mse_val = error_f(Yval, Tval)
+                self.error_trace_val.append(mse_val.sqrt())
+                
+                if best_mse is None or mse_val < best_mse:
+                    best_mse = mse_val
+                    best_weights = self.get_all_weights()
+                    self.best_epoch = epoch
+            # if self.error_trace[-1] < 50.0:
+            #     break
+            if verbose and ((epoch+1) % (n_epochs // 10) == 0 or epoch == n_epochs - 1):
+                if Xval is not None:
+                    print(f'Epoch {epoch+1} RMSE train {self.error_trace[-1]:.4f} val {self.error_trace_val[-1]:.4f}')
+                else:
+                    print(f'Epoch {epoch+1} RMSE {self.error_trace[-1]:.4f}')
+                
+        if Xval is not None:
+            self.set_all_weights(best_weights)
+
+        return self
+
     def use(self, X, return_hidden_layer_outputs=False):
-        Xst = standardize_X(X, self.stand_params)
-        Outs = self.forward(Xst) 
-        if return_hidden_layer_outputs:
-            return unstandardize_T(Outs[len(Outs)-1], self.stand_params), Outs[:-1]
-        else:
-            return unstandardize_T(Outs[len(Outs)-1], self.stand_params)
-    
+        if isinstance(X, np.ndarray):
+            X = torch.from_numpy(X.astype(np.float32))
+
+        Xst = self.standardize_X(X)
+        Ys = self.forward(Xst)
+        Y = Ys[-1]
+        Y = self.unstandardize_T(Y)
+        Zs = Ys[:-1]
+        Y = Y.detach().cpu().numpy()
+        Zs = [Z.detach().cpu().numpy() for Z in Zs]
+        return (Y, Zs) if return_hidden_layer_outputs else Y
+
     def get_error_trace(self):
         return self.error_trace
-    
-    def forward(self, Xst):
-        Z = np.tanh(add_ones(Xst) @ self.Ws[0])
-        Outs = []
-        Outs.append(Z)
-        for i in range(1,len(self.Ws)-1):
-            Outs.append(np.tanh(add_ones(Outs[i-1]) @ self.Ws[i]))
-        Outs.append(add_ones(Outs[len(Outs)-1]) @ self.Ws[len(self.Ws)-1])
-        return Outs
 
-    def backward(self, Xst, Tst):
-        n_samples = Xst.shape[0]
-        n_outputs = Tst.shape[1]
-        Outs = self.forward(Xst)
-        gradient_ms = []
-        gradient_vs = []
-        delta = -2 * (Tst - Outs[len(Outs)-1]) /  (n_samples * n_outputs)
-        gradient_w = add_ones(Outs[len(Outs)-2]).T @ delta
-        lenH = len(Outs)
-        for i in range(2, lenH):
-            delta = (delta @ self.Ws[lenH-i+1][1:, :].T) * (1 - Outs[lenH-i] ** 2)
-            gradient_vs.append(add_ones(Outs[lenH-i-1]).T @ delta)
-        delta = (delta @ self.Ws[1][1:, :].T) * (1 - Outs[0] ** 2)
-        self.Gs[0][:] = add_ones(Xst).T @ delta
-        for i in reversed(range(len(gradient_vs))):
-            self.Gs[len(self.Gs)-i-2][:] = gradient_vs[i]
-        self.Gs[len(self.Gs)-1][:] = gradient_w
-        return self.all_gradients
-    
-    def mse(self, Xst, Tst):
-        Outs = self.forward(Xst)
-        return np.mean((Tst - Outs[len(Outs)-1])**2)
+    def get_error_traces(self):
+        return self.error_trace, self.error_trace_val, self.best_epoch
 
+    def calc_standardize_parameters(self, X, T):
+        Xmeans = X.mean(axis=0)
+        Xstds = X.std(axis=0)
+        Xstds[Xstds == 0] = Xstds[Xstds > 0].mean(axis=0)
+        if T is None:
+            return {'Xmeans': Xmeans, 'Xstds': Xstds}
+        else:
+            Tmeans = T.mean(axis=0)
+            Tstds = T.std(axis=0)
+            return {'Xmeans': Xmeans, 'Xstds': Xstds, 'Tmeans': Tmeans, 'Tstds': Tstds}
+
+    def standardize_X(self, X):
+        return (X - self.stand_params['Xmeans']) / self.stand_params['Xstds']
+
+    def unstandardize_X(self, Xst):
+        return Xst * self.stand_params['Xstds'] + self.stand_params['Xmeans']
+
+    def standardize_T(self, T):
+        return (T - self.stand_params['Tmeans']) / self.stand_params['Tstds']
+
+    def unstandardize_T(self, Tst):
+        return Tst * self.stand_params['Tstds'] + self.stand_params['Tmeans']
+
+    def get_Ws(self):
+        Ws = []
+        for layer in self.layers:
+            W_and_bias = list(layer.parameters())
+            W = W_and_bias[0].detach().numpy()
+            Wbias = W_and_bias[1].detach().numpy().T.reshape(1, -1)
+            if W.ndim == 4:
+                W = np.moveaxis(W, 0, 3)  # first dim is units. Move it to last, fourth, dim
+                n_units = Wbias.shape[-1]
+                W = W.reshape(-1, n_units)
+            else:
+                W = W.T
+            Ws.append(np.vstack((Wbias, W)))
+        return Ws
+        
+    def get_all_weights(self):
+        return torch.nn.utils.parameters_to_vector(self.parameters())
+
+    def set_all_weights(self, all_weights):
+        torch.nn.utils.vector_to_parameters(all_weights, self.parameters())
 
 def add_ones(X):
     return np.insert(X, 0, 1, axis=1)
@@ -134,7 +196,7 @@ def unstandardize_T(Tst, stand_parms):
 
 
 
-def run(Xtrain, Ttrain, Xtest, Ttest, method, n_epochs, learning_rate, hidden_unit_list=[50, 50, 50, 50, 50]):
+def run(Xtrain, Ttrain, Xtest, Ttest, method, n_epochs, learning_rate, device, hidden_unit_list=[50, 50, 50, 50, 50]):
     
     # n_samples = 30
     # Xtrain = np.linspace(0., 20.0, n_samples).reshape((n_samples, 1))
@@ -143,11 +205,16 @@ def run(Xtrain, Ttrain, Xtest, Ttest, method, n_epochs, learning_rate, hidden_un
     # Xtest = Xtrain + 0.1 * np.random.normal(size=(n_samples, 1))
     # Ttest = 0.2 + 0.05 * (Xtest) + 0.4 * np.sin(Xtest / 2) + 0.2 * np.random.normal(size=(n_samples, 1))
     # print(Xtrain)
+    # Xtrain = torch.FloatTensor(Xtrain).cpu().cuda()
+    # Ttrain = torch.FloatTensor(Ttrain).cpu().cuda()
+    # Xtest = torch.FloatTensor(Xtest).cpu().cuda()
+    # Ttest = torch.FloatTensor(Ttest).cpu().cuda()
     n_inputs = Xtrain.shape[1]
     n_hiddens_list = hidden_unit_list
     n_outputs = Ttrain.shape[1]
 
-    nnet = NeuralNetwork(n_inputs, n_hiddens_list, n_outputs)
+    nnet = NeuralNetwork(n_inputs, n_hiddens_list, n_outputs, device)
+    nnet.cuda()
     nnet.train(Xtrain, Ttrain, n_epochs, learning_rate, method=method, verbose=False)
 
     def rmse(Y, T):
@@ -155,8 +222,11 @@ def run(Xtrain, Ttrain, Xtest, Ttest, method, n_epochs, learning_rate, hidden_un
         return np.sqrt(np.mean(error ** 2))
 
     Ytrain = nnet.use(Xtrain)
+    Ttrain = Ttrain.detach().cpu().numpy()
+    # print(Ttrain)
     rmse_train = rmse(Ytrain, Ttrain)
     Ytest = nnet.use(Xtest)
+    Ttest = Ttest.detach().cpu().numpy()
     rmse_test = rmse(Ytest, Ttest)
 
     print(f'Method: {method}, RMSE: Train {rmse_train:.2f} Test {rmse_test:.2f}')

@@ -129,13 +129,20 @@ def createPandasDataFrame(args):
         if(args.verbose):
             print("nn_inputs == {}\n".format(str(args.nn_inputs)))
 
-        car_data_df = pd.read_csv(args.train_nnet_csv, usecols=wanted_columns)
+        car_data_df = pd.read_csv(args.train_nnet_csv, usecols=wanted_columns, low_memory=False)
     else:
-        car_data_df = pd.read_csv(args.train_nnet_csv)
+        car_data_df = pd.read_csv(args.train_nnet_csv, low_memory=False)
 
     if('price' in args.nn_outputs):
-        car_data_df = car_data_df[car_data_df['price'] > 0]
-
+        # try:
+        car_data_df['price'] = car_data_df['price'].dropna()
+        car_data_df['price'] = car_data_df[car_data_df['price'].apply(lambda x: str(x).isdigit())]
+        car_data_df['price'] = car_data_df['price'].apply(pd.to_numeric)
+        # car_data_df = pd.to_numeric(car_data_df["price"])
+        car_data_df = car_data_df[car_data_df['price'] > 800]
+        car_data_df = car_data_df[car_data_df['price'] < 200000]
+        # except:
+        #     print(car_data_df['price'])
     # TODO clean up NANS and strings to be enums and values that can be used for training the neural network
     column_enum_map = dict()
     df_subset = car_data_df.select_dtypes(include=["object"])
@@ -165,6 +172,13 @@ def createTrainingData(args, car_df):
     return partition(Xvalues, Tvalues, shuffle=True)
 
 
+def get_default_device():
+    """Pick GPU if available, else CPU"""
+    if torch.cuda.is_available():
+        return torch.device('cuda')
+    else:
+        return torch.device('cpu')
+
 if(__name__ == "__main__"):
 
     parser = createArgParser()
@@ -192,9 +206,17 @@ if(__name__ == "__main__"):
 
         if (args.hidden_units):
             args.hidden_units = list(map(int, args.hidden_units.strip('[]').replace(" ", "").split(',')))
-            car = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 30000, 0.1, args.hidden_units)
+            device = 'cpu'
+            device = get_default_device()
+            print("running on",device)
+            Xtrain = torch.FloatTensor(Xtrain).to(device)
+            Ttrain = torch.FloatTensor(Ttrain).to(device)
+            Xtest = torch.FloatTensor(Xtest).to(device)
+            Ttest = torch.FloatTensor(Ttest).to(device)
+            # print(Xtrain.device)
+            car = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 30000000, 0.1, device, args.hidden_units)
         else:
-            car = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 30000, 0.1)
+            car = run(Xtrain, Ttrain, Xtest, Ttest, 'sgd', 30000, 0.1, device)
 
         saveNnet = input("Would you like to save the Neural Network: ").lower()
         if(saveNnet == "yes" or saveNnet == "y"):
@@ -211,7 +233,7 @@ if(__name__ == "__main__"):
 
 
     """If there is a user car then we want to predict"""
-    # used_car_input_list = None
+    used_car_input_list = None
     if(args.user_car):
         if(car is None):
             print("no currently train neural network going to load saved one")
@@ -222,16 +244,10 @@ if(__name__ == "__main__"):
                 column_mapping_dict = pickle.load(file_read)
                 file_read = open(SAVED_INPUT_LIST_FILE, 'rb')
                 input_list = pickle.load(file_read)
-                # print(input_list)
                 app = QApplication(sys.argv)
                 dialogue = InputDialog(input_list, column_mapping_dict)
-                # print(column_mapping_dict)
                 if( dialogue.exec() ):
                     used_car_input_list = dialogue.getInputList()
-                    # print(type(used_car_input_list[2]))
-                    if (used_car_input_list[2] == 0 or used_car_input_list[1] == 0):
-                        print("model or make is not found, please check")
-                        quit()
 
             except OSError:
                 print("Could not open/read a saved neural network need to train and save one")
